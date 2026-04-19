@@ -19,7 +19,7 @@ final class OrderController extends Controller
             return response()->json([
                 'data' => [
                     'id' => $order->id,
-                    'risk_score' => $order->risk_score,
+                    'risk_score' => (float) ($order->risk_score ?? 0),
                 ],
             ], 201);
         }
