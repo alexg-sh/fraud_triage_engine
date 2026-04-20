@@ -38,8 +38,8 @@ const navigation: Array<{
     key: 'review',
   },
   {
-    href: '/horizon',
-    label: 'Queue workers',
+    href: '/queue-monitor',
+    label: 'Queue monitor',
     icon: Activity01Icon,
     key: 'queue',
   },
@@ -112,7 +112,7 @@ function SidebarLink({
 function getActiveNav(url: string): NavKey {
   const [pathname, search = ''] = url.split('?');
 
-  if (pathname === '/horizon') {
+  if (pathname === '/queue-monitor') {
     return 'queue';
   }
 

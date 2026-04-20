@@ -30,6 +30,7 @@ final class ProcessOrderTriageTest extends TestCase
         $order->refresh();
 
         $this->assertSame(0.0, $order->risk_score);
+        $this->assertSame([], $order->risk_signals);
         $this->assertNull($order->ai_investigation_note);
     }
 
@@ -55,7 +56,13 @@ final class ProcessOrderTriageTest extends TestCase
 
         $order->refresh();
 
-        $this->assertSame(100.0, $order->risk_score);
+        $this->assertSame(72.0, $order->risk_score);
+        $this->assertSame([
+            'Billing/shipping country mismatch (UNITED KINGDOM vs ROMANIA)',
+            'High basket value exceeds GBP 2,000',
+            'High order frequency from shared IP (3 recent)',
+            'Disposable or suspicious email domain',
+        ], $order->risk_signals);
         $this->assertNull($order->ai_investigation_note);
     }
 }

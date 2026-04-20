@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Models\Order;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Redis;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -70,8 +72,31 @@ final class QueueMonitorController extends Controller
             'recentTriagedOrders' => $recentTriagedOrders->values(),
             'runtime' => [
                 'queue_connection' => (string) config('queue.default'),
-                'horizon_available' => extension_loaded('redis'),
+                'horizon_available' => $this->horizonAvailable(),
+            ],
+            'demoJob' => [
+                'total_runs' => (int) Cache::get('demo_queue.total_runs', 0),
+                'last_run' => Cache::get('demo_queue.last_run'),
             ],
         ]);
+    }
+
+    private function horizonAvailable(): bool
+    {
+        if (! array_key_exists('redis', (array) config('queue.connections'))) {
+            return false;
+        }
+
+        if (! class_exists(\Redis::class) && ! class_exists(\Predis\Client::class)) {
+            return false;
+        }
+
+        try {
+            Redis::connection(config('horizon.use', 'default'))->ping();
+
+            return true;
+        } catch (\Throwable) {
+            return false;
+        }
     }
 }

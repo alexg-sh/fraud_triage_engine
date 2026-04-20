@@ -24,7 +24,11 @@ class Order extends Model
         'billing_address',
         'shipping_address',
         'risk_score',
+        'risk_signals',
         'ai_investigation_note',
+        'decision_status',
+        'decision_note',
+        'decisioned_at',
     ];
 
     /**
@@ -35,6 +39,8 @@ class Order extends Model
         return [
             'total_amount' => 'decimal:2',
             'risk_score' => 'float',
+            'risk_signals' => 'array',
+            'decisioned_at' => 'datetime',
         ];
     }
 
@@ -53,5 +59,10 @@ class Order extends Model
     public function requiresReview(): bool
     {
         return $this->risk_score >= 50.0;
+    }
+
+    public function hasDecision(): bool
+    {
+        return is_string($this->decision_status) && $this->decision_status !== '';
     }
 }

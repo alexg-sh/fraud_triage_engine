@@ -14,17 +14,20 @@ final class OrderRiskScorer
     {
         $signals = [];
         $score = 0.0;
+        $amount = (float) $order->total_amount;
 
         $billingCountry = $this->extractCountry($order->billing_address);
         $shippingCountry = $this->extractCountry($order->shipping_address);
 
         if ($billingCountry !== null && $shippingCountry !== null && $billingCountry !== $shippingCountry) {
-            $score += 35;
+            $score += 34;
             $signals[] = sprintf('Billing/shipping country mismatch (%s vs %s)', $billingCountry, $shippingCountry);
         }
 
-        if ((float) $order->total_amount > 2000.0) {
-            $score += 30;
+        $basketValueScore = $this->basketValueScore($amount);
+
+        if ($basketValueScore > 0) {
+            $score += $basketValueScore;
             $signals[] = 'High basket value exceeds GBP 2,000';
         }
 
@@ -34,13 +37,15 @@ final class OrderRiskScorer
             ->where('created_at', '>=', ($order->created_at ?? now())->copy()->subDay())
             ->count();
 
-        if ($recentSameIpOrders >= 3) {
-            $score += 25;
+        $sharedIpScore = $this->sharedIpScore($recentSameIpOrders);
+
+        if ($sharedIpScore > 0) {
+            $score += $sharedIpScore;
             $signals[] = sprintf('High order frequency from shared IP (%d recent)', $recentSameIpOrders);
         }
 
         if ($this->looksDisposableEmail($order->customer_email)) {
-            $score += 10;
+            $score += 8;
             $signals[] = 'Disposable or suspicious email domain';
         }
 
@@ -51,9 +56,29 @@ final class OrderRiskScorer
                 'recent_same_ip_orders' => $recentSameIpOrders,
                 'billing_country' => $billingCountry ?? 'unknown',
                 'shipping_country' => $shippingCountry ?? 'unknown',
-                'amount' => (float) $order->total_amount,
+                'amount' => $amount,
             ],
         );
+    }
+
+    private function basketValueScore(float $amount): float
+    {
+        return match (true) {
+            $amount > 3500.0 => 28.0,
+            $amount > 2500.0 => 22.0,
+            $amount > 2000.0 => 16.0,
+            default => 0.0,
+        };
+    }
+
+    private function sharedIpScore(int $recentSameIpOrders): float
+    {
+        return match (true) {
+            $recentSameIpOrders >= 5 => 20.0,
+            $recentSameIpOrders >= 3 => 14.0,
+            $recentSameIpOrders >= 2 => 8.0,
+            default => 0.0,
+        };
     }
 
     private function extractCountry(string $address): ?string

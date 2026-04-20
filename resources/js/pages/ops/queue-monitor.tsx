@@ -1,4 +1,4 @@
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, usePage } from '@inertiajs/react';
 import type { ReactNode } from 'react';
 import {
   Alert01Icon,
@@ -17,6 +17,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { usePagePolling } from '@/lib/use-page-polling';
 
 type QueueMonitorProps = {
   stats: {
@@ -51,11 +52,23 @@ type QueueMonitorProps = {
     queue_connection: string;
     horizon_available: boolean;
   };
+  demoJob: {
+    total_runs: number;
+    last_run: {
+      reference: string;
+      queue: string;
+      completed_at: string;
+      total_runs: number;
+    } | null;
+  };
 };
 
 const timestamp = new Intl.DateTimeFormat('en-GB', {
   dateStyle: 'medium',
   timeStyle: 'short',
+});
+const syncTime = new Intl.DateTimeFormat('en-GB', {
+  timeStyle: 'medium',
 });
 
 export default function QueueMonitor({
@@ -64,7 +77,14 @@ export default function QueueMonitor({
   failedJobs,
   recentTriagedOrders,
   runtime,
+  demoJob,
 }: QueueMonitorProps) {
+  const { flash } = usePage<{ flash?: { status?: string | null } }>().props;
+  const { isRefreshing, lastUpdatedAt } = usePagePolling({
+    intervalMs: 1000,
+    only: ['stats', 'pendingJobs', 'failedJobs', 'recentTriagedOrders', 'runtime', 'demoJob'],
+  });
+
   return (
     <>
       <Head title="Queue Monitor" />
@@ -84,14 +104,20 @@ export default function QueueMonitor({
                 <div>
                   <h1 className="font-heading text-2xl font-medium tracking-tight text-foreground">Jobs</h1>
                   <p className="text-sm text-muted-foreground">
-                    Database-backed queue monitor for local development. This replaces Horizon when Redis is not
-                    available.
+                    Database-backed queue monitor for local development and non-Redis environments.
                   </p>
                 </div>
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
-                <Button render={<Link href="/horizon" />} variant="outline" size="xs">
+                <Badge variant="outline">{isRefreshing ? 'Syncing' : `Live ${syncTime.format(new Date(lastUpdatedAt))}`}</Badge>
+                {runtime.horizon_available ? (
+                  <Button render={<Link href="/horizon" />} variant="outline" size="xs">
+                    <AppIcon icon={TaskDone01Icon} data-icon="inline-start" />
+                    Open Horizon
+                  </Button>
+                ) : null}
+                <Button render={<Link href="/queue-monitor" />} variant="outline" size="xs">
                   <AppIcon icon={RefreshIcon} data-icon="inline-start" />
                   Refresh
                 </Button>
@@ -99,13 +125,21 @@ export default function QueueMonitor({
             </CardContent>
           </Card>
 
+          {flash?.status ? (
+            <Alert>
+              <AppIcon icon={TaskDone01Icon} />
+              <AlertTitle>Queue update</AlertTitle>
+              <AlertDescription>{flash.status}</AlertDescription>
+            </Alert>
+          ) : null}
+
           {!runtime.horizon_available ? (
             <Alert>
               <AppIcon icon={Alert01Icon} />
               <AlertTitle>Redis Horizon is unavailable in this environment</AlertTitle>
               <AlertDescription>
                 The app is running jobs with the database queue worker instead. `composer dev` now starts
-                `queue:work database --queue=triage,default`.
+                `queue:work database --queue=triage,default`. Use `composer dev:horizon` when Redis is available.
               </AlertDescription>
             </Alert>
           ) : null}
@@ -122,9 +156,39 @@ export default function QueueMonitor({
             <MetricCard icon={TaskDone01Icon} label="Triaged orders" value={stats.triaged_orders.toString()} />
           </section>
 
+          <Card size="sm" className="bg-card/95 shadow-xl shadow-black/5">
+            <CardHeader>
+              <CardTitle>Demo job</CardTitle>
+              <CardDescription>Queue a visible `default` job so the demo has work outside order triage.</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4 py-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex flex-col gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="outline">default queue</Badge>
+                  <Badge variant="secondary">{demoJob.total_runs} runs</Badge>
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  {demoJob.last_run ? (
+                    <>Last completed {timestamp.format(new Date(demoJob.last_run.completed_at))} as {demoJob.last_run.reference}.</>
+                  ) : (
+                    <>No demo jobs have completed yet.</>
+                  )}
+                </div>
+              </div>
+
+              <Button
+                render={<Link href="/queue-monitor/demo-job" method="post" as="button" />}
+                size="xs"
+              >
+                  <AppIcon icon={TaskDone01Icon} data-icon="inline-start" />
+                  Dispatch demo job
+                </Button>
+            </CardContent>
+          </Card>
+
           <section className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
             <Card size="sm" className="bg-card/95 shadow-xl shadow-black/5">
-              <CardHeader className="border-b">
+              <CardHeader>
                 <CardTitle>Pending queue</CardTitle>
                 <CardDescription>Jobs waiting in the database queue tables.</CardDescription>
               </CardHeader>
@@ -161,7 +225,7 @@ export default function QueueMonitor({
             </Card>
 
             <Card size="sm" className="bg-card/95 shadow-xl shadow-black/5">
-              <CardHeader className="border-b">
+              <CardHeader>
                 <CardTitle>Recent triage</CardTitle>
                 <CardDescription>Latest orders that have been scored or annotated.</CardDescription>
               </CardHeader>
@@ -194,7 +258,7 @@ export default function QueueMonitor({
           </section>
 
           <Card size="sm" className="bg-card/95 shadow-xl shadow-black/5">
-            <CardHeader className="border-b">
+            <CardHeader>
               <CardTitle>Failed jobs</CardTitle>
               <CardDescription>Most recent exceptions captured in `failed_jobs`.</CardDescription>
             </CardHeader>

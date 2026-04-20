@@ -31,10 +31,17 @@ final class ProcessOrderTriage implements ShouldQueue
             return;
         }
 
+        $delayMs = app()->isLocal() ? (int) env('TRIAGE_JOB_DELAY_MS', 150) : 0;
+
+        if ($delayMs > 0) {
+            usleep($delayMs * 1000);
+        }
+
         $profile = $scorer->score($order);
 
         $order->forceFill([
             'risk_score' => $profile->score,
+            'risk_signals' => $profile->signals,
             // AI notes are generated on demand when an analyst opens the order.
             'ai_investigation_note' => null,
         ])->save();

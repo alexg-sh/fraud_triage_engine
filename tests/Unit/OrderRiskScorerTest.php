@@ -31,7 +31,7 @@ final class OrderRiskScorerTest extends TestCase
         $this->assertSame([], $profile->signals);
     }
 
-    public function test_weighted_signals_accumulate_and_clamp_to_one_hundred(): void
+    public function test_weighted_signals_accumulate_into_a_high_but_not_flat_score(): void
     {
         Queue::fake();
 
@@ -51,7 +51,7 @@ final class OrderRiskScorerTest extends TestCase
 
         $profile = app(OrderRiskScorer::class)->score($order);
 
-        $this->assertSame(100.0, $profile->score);
+        $this->assertSame(78.0, $profile->score);
         $this->assertCount(4, $profile->signals);
         $this->assertTrue($profile->shouldEscalate());
     }

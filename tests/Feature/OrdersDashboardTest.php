@@ -15,11 +15,11 @@ final class OrdersDashboardTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_dashboard_renders_review_badge_and_ai_note(): void
+    public function test_dashboard_renders_review_badge_and_session_note(): void
     {
         Queue::fake();
 
-        Order::factory()->create([
+        $order = Order::factory()->create([
             'risk_score' => 82.4,
             'ai_investigation_note' => 'Chargeback risk is elevated because the address pair conflicts with the order value.',
         ]);
@@ -29,7 +29,14 @@ final class OrdersDashboardTest extends TestCase
             'ai_investigation_note' => null,
         ]);
 
-        $response = $this->get('/orders');
+        $response = $this->withSession([
+            'order_investigation_notes' => [
+                $order->id => [
+                    'note' => 'Chargeback risk is elevated because the address pair conflicts with the order value.',
+                    'risk_score' => 82.4,
+                ],
+            ],
+        ])->get('/orders');
 
         $response
             ->assertOk()
@@ -37,10 +44,31 @@ final class OrdersDashboardTest extends TestCase
                 ->component('orders/dashboard')
                 ->where('stats.review_orders', 1)
                 ->where('orders.data.0.requires_review', true)
+                ->where('orders.data.0.risk_signals', [])
+                ->where('orders.data.0.decision_status', null)
                 ->where(
                     'orders.data.0.ai_investigation_note',
                     'Chargeback risk is elevated because the address pair conflicts with the order value.',
                 )
+            );
+    }
+
+    public function test_dashboard_ignores_database_note_without_session_cache(): void
+    {
+        Queue::fake();
+
+        Order::factory()->create([
+            'risk_score' => 82.4,
+            'ai_investigation_note' => 'Stale database note.',
+        ]);
+
+        $response = $this->get('/orders');
+
+        $response
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('orders/dashboard')
+                ->where('orders.data.0.ai_investigation_note', null)
             );
     }
 
@@ -66,6 +94,98 @@ final class OrdersDashboardTest extends TestCase
                 ->component('orders/dashboard')
                 ->where('orders.data.0.requires_review', true)
                 ->where('orders.data', fn (Collection $orders): bool => $orders->count() === 1)
+            );
+    }
+
+    public function test_dashboard_can_search_by_email_and_ip(): void
+    {
+        Queue::fake();
+
+        Order::factory()->create([
+            'customer_email' => 'analyst-match@example.com',
+            'ip_address' => '203.0.113.77',
+        ]);
+
+        Order::factory()->create([
+            'customer_email' => 'other@example.com',
+            'ip_address' => '198.51.100.40',
+        ]);
+
+        $response = $this->get('/orders?search=203.0.113.77');
+
+        $response
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('orders/dashboard')
+                ->where('orders.data', fn (Collection $orders): bool => $orders->count() === 1)
+                ->where('orders.data.0.customer_email', 'analyst-match@example.com')
+            );
+    }
+
+    public function test_dashboard_can_filter_undecided_orders(): void
+    {
+        Queue::fake();
+
+        Order::factory()->create([
+            'risk_score' => 82.4,
+            'decision_status' => null,
+        ]);
+
+        Order::factory()->create([
+            'risk_score' => 85.0,
+            'decision_status' => 'blocked',
+        ]);
+
+        $response = $this->get('/orders?decision=undecided');
+
+        $response
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('orders/dashboard')
+                ->where('orders.data', fn (Collection $orders): bool => $orders->count() === 1)
+                ->where('orders.data.0.decision_status', null)
+            );
+    }
+
+    public function test_dashboard_can_filter_by_risk_band(): void
+    {
+        Queue::fake();
+
+        Order::factory()->create([
+            'risk_score' => 22.0,
+        ]);
+
+        Order::factory()->create([
+            'risk_score' => 66.5,
+        ]);
+
+        Order::factory()->create([
+            'risk_score' => 92.0,
+        ]);
+
+        $response = $this->get('/orders?risk=high');
+
+        $response
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('orders/dashboard')
+                ->where('orders.data', fn (Collection $orders): bool => $orders->count() === 1)
+                ->where('orders.data.0.risk_score', 92)
+            );
+    }
+
+    public function test_dashboard_starts_empty_without_seeded_orders(): void
+    {
+        Queue::fake();
+
+        $response = $this->get('/orders');
+
+        $response
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('orders/dashboard')
+                ->where('stats.total_orders', 0)
+                ->where('orders.data', fn (Collection $orders): bool => $orders->count() === 0)
             );
     }
 }

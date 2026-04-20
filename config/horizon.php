@@ -41,7 +41,7 @@ return [
     |
     */
 
-    'path' => env('HORIZON_PATH', 'horizon-redis'),
+    'path' => env('HORIZON_PATH', 'horizon'),
 
     /*
     |--------------------------------------------------------------------------

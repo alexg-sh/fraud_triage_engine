@@ -16,6 +16,9 @@ services:
       QUEUE_CONNECTION: database
       CACHE_STORE: file
       SESSION_DRIVER: file
+      REDIS_CLIENT: predis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
     ports:
       - "8000:8000"
     volumes:
@@ -39,12 +42,21 @@ services:
       QUEUE_CONNECTION: database
       CACHE_STORE: file
       SESSION_DRIVER: file
+      REDIS_CLIENT: predis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
     volumes:
       - app-storage:/var/www/html/storage
     command: php artisan queue:work database --queue=triage,default --tries=1 --sleep=1
     entrypoint: ["sh", "-c", "until [ -f /var/www/html/storage/database/database.sqlite ]; do sleep 1; done; exec /usr/local/bin/docker-entrypoint \"$@\"", "--"]
     depends_on:
       - app
+      - redis
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
 
 volumes:
   app-storage:
