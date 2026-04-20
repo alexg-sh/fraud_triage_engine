@@ -32,5 +32,7 @@ final class OrderSeederTest extends TestCase
             return str_ends_with($order->customer_email, '@tempmail.test')
                 || str_ends_with($order->customer_email, '@maildrop.cc');
         })->count());
+        $this->assertGreaterThan(0, $orders->where('risk_score', '>=', 50)->count());
+        $this->assertGreaterThan(0, $orders->whereNotNull('ai_investigation_note')->count());
     }
 }
