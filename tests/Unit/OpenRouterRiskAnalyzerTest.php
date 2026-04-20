@@ -9,6 +9,7 @@ use App\Services\OpenRouterRiskAnalyzer;
 use Database\Factories\OrderFactory;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Tests\TestCase;
 
 final class OpenRouterRiskAnalyzerTest extends TestCase
@@ -49,9 +50,20 @@ final class OpenRouterRiskAnalyzerTest extends TestCase
     public function test_service_falls_back_when_request_fails(): void
     {
         Config::set('services.openrouter.api_key', 'test-key');
+        Log::shouldReceive('warning')
+            ->once()
+            ->withArgs(function (string $message, array $context): bool {
+                return $message === 'OpenRouter risk analysis failed.'
+                    && $context['order_id'] === 777
+                    && $context['reason'] === 'AI analysis failed with HTTP 500: Upstream timeout from provider';
+            });
 
         Http::fake([
-            'https://openrouter.ai/api/v1/chat/completions' => Http::response([], 500),
+            'https://openrouter.ai/api/v1/chat/completions' => Http::response([
+                'error' => [
+                    'message' => 'Upstream timeout from provider',
+                ],
+            ], 500),
         ]);
 
         $order = OrderFactory::new()->make(['id' => 777]);
@@ -61,7 +73,54 @@ final class OpenRouterRiskAnalyzerTest extends TestCase
 
         $this->assertSame(55.0, $result->riskScore);
         $this->assertSame(
-            'High-risk order requires manual review; AI analysis is temporarily unavailable.',
+            'Manual review required due to high amount; AI analysis failed with HTTP 500: Upstream timeout from provider.',
+            $result->investigationNote,
+        );
+    }
+
+    public function test_service_falls_back_with_signal_summary_when_api_key_is_missing(): void
+    {
+        Config::set('services.openrouter.api_key', '');
+
+        $order = OrderFactory::new()->make(['id' => 778]);
+        $profile = new OrderRiskProfile(
+            85.0,
+            ['Billing/shipping country mismatch (UK vs RO)', 'High basket value exceeds GBP 2,000'],
+            ['amount' => 2750.00],
+        );
+
+        $result = app(OpenRouterRiskAnalyzer::class)->analyze($order, $profile);
+
+        $this->assertSame(85.0, $result->riskScore);
+        $this->assertSame(
+            'Manual review required due to billing/shipping country mismatch (UK vs RO) and High basket value exceeds GBP 2,000; OpenRouter is not configured.',
+            $result->investigationNote,
+        );
+    }
+
+    public function test_service_falls_back_with_connection_reason(): void
+    {
+        Config::set('services.openrouter.api_key', 'test-key');
+        Log::shouldReceive('warning')
+            ->once()
+            ->withArgs(function (string $message, array $context): bool {
+                return $message === 'OpenRouter risk analysis failed.'
+                    && $context['order_id'] === 779
+                    && $context['reason'] === 'AI analysis failed: cURL error 6: Could not resolve host: openrouter.ai';
+            });
+
+        Http::fake(function (): never {
+            throw new \Illuminate\Http\Client\ConnectionException('cURL error 6: Could not resolve host: openrouter.ai');
+        });
+
+        $order = OrderFactory::new()->make(['id' => 779]);
+        $profile = new OrderRiskProfile(75.0, ['Country mismatch'], ['recent_same_ip_orders' => 4]);
+
+        $result = app(OpenRouterRiskAnalyzer::class)->analyze($order, $profile);
+
+        $this->assertSame(75.0, $result->riskScore);
+        $this->assertSame(
+            'Manual review required due to country mismatch; AI analysis failed: cURL error 6: Could not resolve host: openrouter.ai.',
             $result->investigationNote,
         );
     }
