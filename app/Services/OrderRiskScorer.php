@@ -20,15 +20,21 @@ final class OrderRiskScorer
         $shippingCountry = $this->extractCountry($order->shipping_address);
 
         if ($billingCountry !== null && $shippingCountry !== null && $billingCountry !== $shippingCountry) {
-            $score += 34;
-            $signals[] = sprintf('Billing/shipping country mismatch (%s vs %s)', $billingCountry, $shippingCountry);
+            $signals[] = $this->signal(
+                'country_mismatch',
+                sprintf('Billing/shipping country mismatch (%s vs %s)', $billingCountry, $shippingCountry),
+                34,
+            );
         }
 
         $basketValueScore = $this->basketValueScore($amount);
 
         if ($basketValueScore > 0) {
-            $score += $basketValueScore;
-            $signals[] = 'High basket value exceeds GBP 2,000';
+            $signals[] = $this->signal(
+                'high_basket',
+                'High basket value exceeds GBP 2,000',
+                (int) $basketValueScore,
+            );
         }
 
         $recentSameIpOrders = Order::query()
@@ -40,14 +46,22 @@ final class OrderRiskScorer
         $sharedIpScore = $this->sharedIpScore($recentSameIpOrders);
 
         if ($sharedIpScore > 0) {
-            $score += $sharedIpScore;
-            $signals[] = sprintf('High order frequency from shared IP (%d recent)', $recentSameIpOrders);
+            $signals[] = $this->signal(
+                'shared_ip',
+                sprintf('High order frequency from shared IP (%d recent)', $recentSameIpOrders),
+                (int) $sharedIpScore,
+            );
         }
 
         if ($this->looksDisposableEmail($order->customer_email)) {
-            $score += 8;
-            $signals[] = 'Disposable or suspicious email domain';
+            $signals[] = $this->signal(
+                'disposable_email',
+                'Disposable or suspicious email domain',
+                8,
+            );
         }
+
+        $score = array_sum(array_column($signals, 'points'));
 
         return new OrderRiskProfile(
             score: max(0.0, min(100.0, $score)),
@@ -59,6 +73,18 @@ final class OrderRiskScorer
                 'amount' => $amount,
             ],
         );
+    }
+
+    /**
+     * @return array{key: string, label: string, points: int}
+     */
+    private function signal(string $key, string $label, int $points): array
+    {
+        return [
+            'key' => $key,
+            'label' => $label,
+            'points' => $points,
+        ];
     }
 
     private function basketValueScore(float $amount): float

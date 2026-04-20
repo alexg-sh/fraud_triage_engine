@@ -7,7 +7,7 @@ namespace App\DataTransferObjects;
 final readonly class OrderRiskProfile
 {
     /**
-     * @param list<string> $signals
+     * @param list<array{key: string, label: string, points: int}> $signals
      * @param array<string, scalar> $metadata
      */
     public function __construct(

@@ -55,6 +55,13 @@ import { usePagePolling } from '@/lib/use-page-polling';
 type DecisionStatus = 'approved' | 'blocked' | 'escalated' | null;
 type DecisionFilter = 'approved' | 'blocked' | 'escalated' | 'undecided' | '';
 type RiskFilter = 'high' | 'medium' | 'low' | '';
+type QuickFilter = 'high_value' | 'shared_ip' | 'cross_border' | 'ai_note_requested' | 'pending_decision' | '';
+
+type RiskSignal = {
+  key: string;
+  label: string;
+  points: number;
+};
 
 type OrderRow = {
   id: number;
@@ -64,7 +71,7 @@ type OrderRow = {
   billing_address: string;
   shipping_address: string;
   risk_score: number;
-  risk_signals: string[];
+  risk_signals: RiskSignal[];
   ai_investigation_note: string | null;
   requires_review: boolean;
   decision_status: DecisionStatus;
@@ -102,6 +109,7 @@ type QueryState = {
   search: string;
   decision: DecisionFilter;
   risk: RiskFilter;
+  quick: QuickFilter;
 };
 
 type BadgeTone = 'secondary' | 'outline' | 'destructive';
@@ -136,13 +144,15 @@ export default function OrdersDashboard({ orders, stats, flash }: DashboardProps
   const [searchTerm, setSearchTerm] = useState(queryState.search);
   const [decisionFilter, setDecisionFilter] = useState<DecisionFilter>(queryState.decision);
   const [riskFilter, setRiskFilter] = useState<RiskFilter>(queryState.risk);
+  const [quickFilter, setQuickFilter] = useState<QuickFilter>(queryState.quick);
   const [orderOverrides, setOrderOverrides] = useState<Record<number, OrderPatch>>({});
 
   useEffect(() => {
     setSearchTerm(queryState.search);
     setDecisionFilter(queryState.decision);
     setRiskFilter(queryState.risk);
-  }, [queryState.decision, queryState.risk, queryState.search]);
+    setQuickFilter(queryState.quick);
+  }, [queryState.decision, queryState.quick, queryState.risk, queryState.search]);
 
   useEffect(() => {
     setOrderOverrides({});
@@ -196,6 +206,7 @@ export default function OrdersDashboard({ orders, stats, flash }: DashboardProps
       search: searchTerm.trim(),
       decision: decisionFilter,
       risk: riskFilter,
+      quick: quickFilter,
     });
   };
 
@@ -205,6 +216,20 @@ export default function OrdersDashboard({ orders, stats, flash }: DashboardProps
       search: '',
       decision: '',
       risk: '',
+      quick: '',
+    });
+  };
+
+  const toggleQuickFilter = (nextQuickFilter: QuickFilter) => {
+    const resolvedQuickFilter = quickFilter === nextQuickFilter ? '' : nextQuickFilter;
+
+    setQuickFilter(resolvedQuickFilter);
+    visitOrders({
+      ...queryState,
+      search: searchTerm.trim(),
+      decision: decisionFilter,
+      risk: riskFilter,
+      quick: resolvedQuickFilter,
     });
   };
 
@@ -339,7 +364,7 @@ export default function OrdersDashboard({ orders, stats, flash }: DashboardProps
             </CardHeader>
 
             <CardContent className="flex flex-col gap-3 py-4">
-              <form onSubmit={submitFilters} className="grid gap-3 rounded-2xl border border-border/70 bg-background/35 p-3 lg:grid-cols-[minmax(0,1.7fr)_0.8fr_0.8fr_auto]">
+              <form onSubmit={submitFilters} className="grid gap-3 rounded-2xl border border-border/70 bg-background/35 p-3 lg:grid-cols-[minmax(0,1.6fr)_0.8fr_0.8fr_auto]">
                 <label className="flex flex-col gap-1.5 text-xs uppercase tracking-[0.14em] text-muted-foreground">
                   Search
                   <input
@@ -389,6 +414,20 @@ export default function OrdersDashboard({ orders, stats, flash }: DashboardProps
                 </div>
               </form>
 
+              <div className="flex flex-wrap items-center gap-2">
+                {QUICK_FILTERS.map((filterOption) => (
+                  <Button
+                    key={filterOption.value}
+                    type="button"
+                    variant={quickFilter === filterOption.value ? 'secondary' : 'outline'}
+                    size="xs"
+                    onClick={() => toggleQuickFilter(filterOption.value)}
+                  >
+                    {filterOption.label}
+                  </Button>
+                ))}
+              </div>
+
               {visibleOrders.length === 0 ? (
                 <EmptyState reviewMode={queryState.filter === 'review'} filteredView={filteredView} />
               ) : (
@@ -398,12 +437,13 @@ export default function OrdersDashboard({ orders, stats, flash }: DashboardProps
                       <TableRow className="hover:bg-transparent">
                         <TableHead className="w-[12%] pl-4 text-[11px] uppercase tracking-[0.14em]">Order</TableHead>
                         <TableHead className="w-[15%] text-[11px] uppercase tracking-[0.14em]">Date</TableHead>
-                        <TableHead className="w-[20%] text-[11px] uppercase tracking-[0.14em]">Customer</TableHead>
-                        <TableHead className="w-[15%] text-[11px] uppercase tracking-[0.14em]">Route</TableHead>
+                        <TableHead className="w-[18%] text-[11px] uppercase tracking-[0.14em]">Customer</TableHead>
+                        <TableHead className="w-[13%] text-[11px] uppercase tracking-[0.14em]">Route</TableHead>
                         <TableHead className="w-[10%] text-[11px] uppercase tracking-[0.14em]">Risk</TableHead>
-                        <TableHead className="w-[12%] text-[11px] uppercase tracking-[0.14em]">Decision</TableHead>
+                        <TableHead className="w-[16%] text-[11px] uppercase tracking-[0.14em]">Signals</TableHead>
+                        <TableHead className="w-[11%] text-[11px] uppercase tracking-[0.14em]">Decision</TableHead>
                         <TableHead className="w-[8%] text-[11px] uppercase tracking-[0.14em]">Total</TableHead>
-                        <TableHead className="w-[8%] pr-4 text-right text-[11px] uppercase tracking-[0.14em]">Review</TableHead>
+                        <TableHead className="w-[9%] pr-4 text-right text-[11px] uppercase tracking-[0.14em]">Context</TableHead>
                       </TableRow>
                     </TableHeader>
 
@@ -454,6 +494,24 @@ export default function OrdersDashboard({ orders, stats, flash }: DashboardProps
                             </TableCell>
 
                             <TableCell className="align-middle">
+                              {order.risk_signals.length > 0 ? (
+                                <div className="flex flex-wrap gap-1.5">
+                                  {order.risk_signals.map((signal) => (
+                                    <Badge
+                                      key={`${order.id}-${signal.key}`}
+                                      variant="outline"
+                                      className="h-auto whitespace-normal px-2 py-1 text-left text-[10px]"
+                                    >
+                                      +{signal.points} {shortSignalLabel(signal)}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span className="text-[11px] text-muted-foreground">No signals</span>
+                              )}
+                            </TableCell>
+
+                            <TableCell className="align-middle">
                               <div className="flex flex-col gap-1">
                                 <Badge variant={decision.variant} className="h-5 px-2 text-[11px]">
                                   {decision.label}
@@ -469,11 +527,16 @@ export default function OrdersDashboard({ orders, stats, flash }: DashboardProps
                             </TableCell>
 
                             <TableCell className="pr-4 text-right align-middle">
-                              <OrderReviewDialog
-                                order={order}
-                                routeLabel={route.label}
-                                onOrderPatch={applyOrderPatch}
-                              />
+                              {order.requires_review ? (
+                                <OrderReviewDialog
+                                  order={order}
+                                  routeLabel={route.label}
+                                  triggerLabel="Open"
+                                  onOrderPatch={applyOrderPatch}
+                                />
+                              ) : (
+                                <span className="text-[11px] text-muted-foreground">Not needed</span>
+                              )}
                             </TableCell>
                           </TableRow>
                         );
@@ -504,10 +567,12 @@ export default function OrdersDashboard({ orders, stats, flash }: DashboardProps
 function OrderReviewDialog({
   order,
   routeLabel,
+  triggerLabel,
   onOrderPatch,
 }: {
   order: OrderRow;
   routeLabel: string;
+  triggerLabel: string;
   onOrderPatch: (orderId: number, patch: OrderPatch) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -678,9 +743,9 @@ function OrderReviewDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger render={<Button variant={requiresReview ? 'destructive' : 'outline'} size="xs" />}>
-        {decisionStatus === null ? 'Open' : 'Update'}
+        {triggerLabel}
       </DialogTrigger>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="max-w-3xl gap-4 sm:gap-5">
         <DialogHeader>
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="outline">Order #{order.id}</Badge>
@@ -694,116 +759,118 @@ function OrderReviewDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {status === 'loading' ? (
-          <Alert>
-            <AppIcon icon={AiBrain03Icon} />
-            <AlertTitle>Refreshing note</AlertTitle>
-            <AlertDescription>
-              Re-running AI analysis for this order now. This usually completes within a few seconds.
-            </AlertDescription>
-          </Alert>
-        ) : null}
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pr-1">
+          {status === 'loading' ? (
+            <Alert>
+              <AppIcon icon={AiBrain03Icon} />
+              <AlertTitle>Refreshing note</AlertTitle>
+              <AlertDescription>
+                Re-running AI analysis for this order now. This usually completes within a few seconds.
+              </AlertDescription>
+            </Alert>
+          ) : null}
 
-        {status === 'error' ? (
-          <Alert variant="destructive">
-            <AppIcon icon={Alert01Icon} />
-            <AlertTitle>Review action failed</AlertTitle>
-            <AlertDescription>{errorMessage ?? 'Unable to load investigation note.'}</AlertDescription>
-          </Alert>
-        ) : null}
+          {status === 'error' ? (
+            <Alert variant="destructive">
+              <AppIcon icon={Alert01Icon} />
+              <AlertTitle>Review action failed</AlertTitle>
+              <AlertDescription>{errorMessage ?? 'Unable to load investigation note.'}</AlertDescription>
+            </Alert>
+          ) : null}
 
-        {status === 'not-needed' ? (
-          <Alert>
-            <AppIcon icon={Shield01Icon} />
-            <AlertTitle>No AI note required</AlertTitle>
-            <AlertDescription>
-              This order is currently below the manual-review threshold. The analyst decision controls are still available.
-            </AlertDescription>
-          </Alert>
-        ) : null}
+          {status === 'not-needed' ? (
+            <Alert>
+              <AppIcon icon={Shield01Icon} />
+              <AlertTitle>No AI note required</AlertTitle>
+              <AlertDescription>
+                This order is currently below the manual-review threshold. The analyst decision controls are still available.
+              </AlertDescription>
+            </Alert>
+          ) : null}
 
-        {status === 'pending' ? (
-          <Alert>
-            <AppIcon icon={AiBrain03Icon} />
-            <AlertTitle>AI note pending</AlertTitle>
-            <AlertDescription>
-              Triage has marked this order for manual review, but the queued AI summary is not available yet. Wait for the job
-              to finish or refresh the note manually.
-            </AlertDescription>
-          </Alert>
-        ) : null}
+          {status === 'pending' ? (
+            <Alert>
+              <AppIcon icon={AiBrain03Icon} />
+              <AlertTitle>AI note pending</AlertTitle>
+              <AlertDescription>
+                Triage has marked this order for manual review, but the queued AI summary is not available yet. Wait for the job
+                to finish or refresh the note manually.
+              </AlertDescription>
+            </Alert>
+          ) : null}
 
-        {status === 'ready' && note !== null ? (
-          <Alert variant="destructive">
-            <AppIcon icon={Alert01Icon} />
-            <AlertTitle>{risk.label}</AlertTitle>
-            <AlertDescription>{note}</AlertDescription>
-          </Alert>
-        ) : null}
+          {status === 'ready' && note !== null ? (
+            <Alert variant="destructive">
+              <AppIcon icon={Alert01Icon} />
+              <AlertTitle>{risk.label}</AlertTitle>
+              <AlertDescription>{note}</AlertDescription>
+            </Alert>
+          ) : null}
 
-        <div className="grid gap-3 md:grid-cols-2">
-          <ContextTile icon={Mail01Icon} label="Customer" value={order.customer_email} />
-          <ContextTile icon={Radar02Icon} label="IP address" value={order.ip_address} />
-          <ContextTile icon={Location01Icon} label="Billing address" value={order.billing_address} />
-          <ContextTile icon={Location01Icon} label="Shipping address" value={order.shipping_address} />
-        </div>
-
-        <div className="rounded-2xl border border-border/70 bg-background/45 p-4">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <div>
-              <div className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Risk signals</div>
-              <div className="mt-1 text-sm text-foreground">Persisted triage reasons behind the current score.</div>
-            </div>
-            <Badge variant={risk.variant}>{risk.label}</Badge>
+          <div className="grid gap-3 md:grid-cols-2">
+            <ContextTile icon={Mail01Icon} label="Customer" value={order.customer_email} />
+            <ContextTile icon={Radar02Icon} label="IP address" value={order.ip_address} />
+            <ContextTile icon={Location01Icon} label="Billing address" value={order.billing_address} />
+            <ContextTile icon={Location01Icon} label="Shipping address" value={order.shipping_address} />
           </div>
 
-          {order.risk_signals.length > 0 ? (
-            <div className="flex flex-wrap gap-2">
-              {order.risk_signals.map((signal) => (
-                <Badge key={signal} variant="outline" className="h-auto whitespace-normal px-2 py-1 text-left text-[11px]">
-                  {signal}
-                </Badge>
-              ))}
+          <div className="rounded-2xl border border-border/70 bg-background/45 p-4">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <div className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Risk signals</div>
+                <div className="mt-1 text-sm text-foreground">Persisted triage reasons behind the current score.</div>
+              </div>
+              <Badge variant={risk.variant}>{risk.label}</Badge>
             </div>
-          ) : (
-            <div className="text-sm text-muted-foreground">No material risk signals were recorded for this order.</div>
-          )}
-        </div>
 
-        <div className="rounded-2xl border border-border/70 bg-background/45 p-4">
-          <div className="mb-3">
-            <div className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Analyst decision</div>
-            <div className="mt-1 text-sm text-foreground">
-              {decisionedAt
-                ? `Last updated ${timestamp.format(new Date(decisionedAt))}`
-                : 'No final decision has been recorded yet.'}
-            </div>
+            {order.risk_signals.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {order.risk_signals.map((signal) => (
+                  <Badge key={signal.key} variant="outline" className="h-auto whitespace-normal px-2 py-1 text-left text-[11px]">
+                    +{signal.points} {signal.label}
+                  </Badge>
+                ))}
+              </div>
+            ) : (
+              <div className="text-sm text-muted-foreground">No material risk signals were recorded for this order.</div>
+            )}
           </div>
 
-          <label className="flex flex-col gap-2 text-sm text-foreground">
-            Decision note
-            <textarea
-              value={decisionNoteInput}
-              onChange={(event) => setDecisionNoteInput(event.target.value)}
-              placeholder="Optional analyst rationale or next step"
-              className="min-h-24 rounded-xl border border-border/70 bg-background/70 px-3 py-2 text-sm text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/30"
-            />
-          </label>
+          <div className="rounded-2xl border border-border/70 bg-background/45 p-4">
+            <div className="mb-3">
+              <div className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Analyst decision</div>
+              <div className="mt-1 text-sm text-foreground">
+                {decisionedAt
+                  ? `Last updated ${timestamp.format(new Date(decisionedAt))}`
+                  : 'No final decision has been recorded yet.'}
+              </div>
+            </div>
 
-          <div className="mt-3 flex flex-wrap gap-2">
-            <Button type="button" variant="secondary" size="sm" onClick={() => void saveDecision('approved')} disabled={savingDecision}>
-              {savingDecision && decisionStatus === 'approved' ? 'Saving' : 'Approve'}
-            </Button>
-            <Button type="button" variant="destructive" size="sm" onClick={() => void saveDecision('blocked')} disabled={savingDecision}>
-              {savingDecision && decisionStatus === 'blocked' ? 'Saving' : 'Block'}
-            </Button>
-            <Button type="button" size="sm" onClick={() => void saveDecision('escalated')} disabled={savingDecision}>
-              {savingDecision && decisionStatus === 'escalated' ? 'Saving' : 'Escalate'}
-            </Button>
+            <label className="flex flex-col gap-2 text-sm text-foreground">
+              Decision note
+              <textarea
+                value={decisionNoteInput}
+                onChange={(event) => setDecisionNoteInput(event.target.value)}
+                placeholder="Optional analyst rationale or next step"
+                className="min-h-24 rounded-xl border border-border/70 bg-background/70 px-3 py-2 text-sm text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/30"
+              />
+            </label>
+
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button type="button" variant="secondary" size="sm" onClick={() => void saveDecision('approved')} disabled={savingDecision}>
+                {savingDecision && decisionStatus === 'approved' ? 'Saving' : 'Approve'}
+              </Button>
+              <Button type="button" variant="destructive" size="sm" onClick={() => void saveDecision('blocked')} disabled={savingDecision}>
+                {savingDecision && decisionStatus === 'blocked' ? 'Saving' : 'Block'}
+              </Button>
+              <Button type="button" size="sm" onClick={() => void saveDecision('escalated')} disabled={savingDecision}>
+                {savingDecision && decisionStatus === 'escalated' ? 'Saving' : 'Escalate'}
+              </Button>
+            </div>
           </div>
         </div>
 
-        <DialogFooter showCloseButton>
+        <DialogFooter className="border-t border-border/70 pt-4" showCloseButton>
           {requiresReview ? (
             <Button type="button" variant="outline" onClick={retry}>
               Refresh AI note
@@ -955,12 +1022,14 @@ function getOrderQueryState(url: string): QueryState {
   const filter = params.get('filter') === 'review' ? 'review' : null;
   const decision = params.get('decision');
   const risk = params.get('risk');
+  const quick = params.get('quick');
 
   return {
     filter,
     search: params.get('search') ?? '',
     decision: isDecisionFilter(decision) ? decision : '',
     risk: isRiskFilter(risk) ? risk : '',
+    quick: isQuickFilter(quick) ? quick : '',
   };
 }
 
@@ -983,6 +1052,10 @@ function buildOrdersParams(state: QueryState): Record<string, string> {
     params.risk = state.risk;
   }
 
+  if (state.quick !== '') {
+    params.quick = state.quick;
+  }
+
   return params;
 }
 
@@ -994,7 +1067,7 @@ function buildOrdersHref(state: QueryState): string {
 }
 
 function hasActiveFilters(state: QueryState): boolean {
-  return state.filter !== null || state.search !== '' || state.decision !== '' || state.risk !== '';
+  return state.filter !== null || state.search !== '' || state.decision !== '' || state.risk !== '' || state.quick !== '';
 }
 
 function getRiskMeta(score: number, requiresReview: boolean): { label: string; variant: BadgeTone } {
@@ -1099,6 +1172,17 @@ function getCountryFlag(country: string | null): string {
   );
 }
 
+function shortSignalLabel(signal: RiskSignal): string {
+  return (
+    {
+      country_mismatch: 'cross-border',
+      high_basket: 'high basket',
+      shared_ip: 'shared IP',
+      disposable_email: 'disposable email',
+    }[signal.key] ?? signal.label
+  );
+}
+
 function isDecisionFilter(value: string | null): value is DecisionFilter {
   return value === '' || value === 'approved' || value === 'blocked' || value === 'escalated' || value === 'undecided';
 }
@@ -1106,3 +1190,22 @@ function isDecisionFilter(value: string | null): value is DecisionFilter {
 function isRiskFilter(value: string | null): value is RiskFilter {
   return value === '' || value === 'high' || value === 'medium' || value === 'low';
 }
+
+function isQuickFilter(value: string | null): value is QuickFilter {
+  return (
+    value === ''
+    || value === 'high_value'
+    || value === 'shared_ip'
+    || value === 'cross_border'
+    || value === 'ai_note_requested'
+    || value === 'pending_decision'
+  );
+}
+
+const QUICK_FILTERS: Array<{ label: string; value: QuickFilter }> = [
+  { label: 'High value', value: 'high_value' },
+  { label: 'Shared IP', value: 'shared_ip' },
+  { label: 'Cross-border', value: 'cross_border' },
+  { label: 'AI note requested', value: 'ai_note_requested' },
+  { label: 'Pending decision', value: 'pending_decision' },
+];

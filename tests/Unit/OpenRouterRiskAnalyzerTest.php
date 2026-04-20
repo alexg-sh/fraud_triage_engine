@@ -37,7 +37,9 @@ final class OpenRouterRiskAnalyzerTest extends TestCase
             'customer_email' => 'risk@example.com',
         ]);
 
-        $profile = new OrderRiskProfile(65.0, ['Country mismatch'], ['recent_same_ip_orders' => 4]);
+        $profile = new OrderRiskProfile(65.0, [
+            ['key' => 'country_mismatch', 'label' => 'Country mismatch', 'points' => 34],
+        ], ['recent_same_ip_orders' => 4]);
 
         $result = app(OpenRouterRiskAnalyzer::class)->analyze($order, $profile);
 
@@ -74,7 +76,9 @@ final class OpenRouterRiskAnalyzerTest extends TestCase
         ]);
 
         $order = OrderFactory::new()->make(['id' => 777]);
-        $profile = new OrderRiskProfile(55.0, ['High amount'], ['amount' => 2499.99]);
+        $profile = new OrderRiskProfile(55.0, [
+            ['key' => 'high_basket', 'label' => 'High amount', 'points' => 16],
+        ], ['amount' => 2499.99]);
 
         $result = app(OpenRouterRiskAnalyzer::class)->analyze($order, $profile);
 
@@ -92,7 +96,10 @@ final class OpenRouterRiskAnalyzerTest extends TestCase
         $order = OrderFactory::new()->make(['id' => 778]);
         $profile = new OrderRiskProfile(
             85.0,
-            ['Billing/shipping country mismatch (UK vs RO)', 'High basket value exceeds GBP 2,000'],
+            [
+                ['key' => 'country_mismatch', 'label' => 'Billing/shipping country mismatch (UK vs RO)', 'points' => 34],
+                ['key' => 'high_basket', 'label' => 'High basket value exceeds GBP 2,000', 'points' => 22],
+            ],
             ['amount' => 2750.00],
         );
 
@@ -121,7 +128,9 @@ final class OpenRouterRiskAnalyzerTest extends TestCase
         });
 
         $order = OrderFactory::new()->make(['id' => 779]);
-        $profile = new OrderRiskProfile(75.0, ['Country mismatch'], ['recent_same_ip_orders' => 4]);
+        $profile = new OrderRiskProfile(75.0, [
+            ['key' => 'country_mismatch', 'label' => 'Country mismatch', 'points' => 34],
+        ], ['recent_same_ip_orders' => 4]);
 
         $result = app(OpenRouterRiskAnalyzer::class)->analyze($order, $profile);
 

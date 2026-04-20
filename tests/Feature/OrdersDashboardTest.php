@@ -121,6 +121,58 @@ final class OrdersDashboardTest extends TestCase
             );
     }
 
+    public function test_dashboard_can_filter_cross_border_orders_from_quick_filters(): void
+    {
+        Queue::fake();
+
+        Order::factory()->create([
+            'risk_score' => 78.0,
+            'risk_signals' => [
+                ['key' => 'country_mismatch', 'label' => 'Billing/shipping country mismatch (UNITED KINGDOM vs ROMANIA)', 'points' => 34],
+            ],
+        ]);
+
+        Order::factory()->create([
+            'risk_score' => 12.5,
+            'risk_signals' => [],
+        ]);
+
+        $response = $this->get('/orders?quick=cross_border');
+
+        $response
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('orders/dashboard')
+                ->where('orders.data', fn (Collection $orders): bool => $orders->count() === 1)
+                ->where('orders.data.0.risk_signals.0.key', 'country_mismatch')
+            );
+    }
+
+    public function test_dashboard_can_filter_pending_decision_orders_from_quick_filters(): void
+    {
+        Queue::fake();
+
+        Order::factory()->create([
+            'risk_score' => 84.0,
+            'decision_status' => null,
+        ]);
+
+        Order::factory()->create([
+            'risk_score' => 84.0,
+            'decision_status' => 'approved',
+        ]);
+
+        $response = $this->get('/orders?quick=pending_decision');
+
+        $response
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('orders/dashboard')
+                ->where('orders.data', fn (Collection $orders): bool => $orders->count() === 1)
+                ->where('orders.data.0.decision_status', null)
+            );
+    }
+
     public function test_dashboard_can_filter_by_risk_band(): void
     {
         Queue::fake();

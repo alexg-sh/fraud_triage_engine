@@ -53,6 +53,12 @@ final class OrderRiskScorerTest extends TestCase
 
         $this->assertSame(78.0, $profile->score);
         $this->assertCount(4, $profile->signals);
+        $this->assertSame([
+            ['key' => 'country_mismatch', 'label' => 'Billing/shipping country mismatch (UNITED KINGDOM vs ROMANIA)', 'points' => 34],
+            ['key' => 'high_basket', 'label' => 'High basket value exceeds GBP 2,000', 'points' => 22],
+            ['key' => 'shared_ip', 'label' => 'High order frequency from shared IP (3 recent)', 'points' => 14],
+            ['key' => 'disposable_email', 'label' => 'Disposable or suspicious email domain', 'points' => 8],
+        ], $profile->signals);
         $this->assertTrue($profile->shouldEscalate());
     }
 }

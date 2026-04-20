@@ -61,10 +61,10 @@ final class ProcessOrderTriageTest extends TestCase
 
         $this->assertSame(72.0, $order->risk_score);
         $this->assertSame([
-            'Billing/shipping country mismatch (UNITED KINGDOM vs ROMANIA)',
-            'High basket value exceeds GBP 2,000',
-            'High order frequency from shared IP (3 recent)',
-            'Disposable or suspicious email domain',
+            ['key' => 'country_mismatch', 'label' => 'Billing/shipping country mismatch (UNITED KINGDOM vs ROMANIA)', 'points' => 34],
+            ['key' => 'high_basket', 'label' => 'High basket value exceeds GBP 2,000', 'points' => 16],
+            ['key' => 'shared_ip', 'label' => 'High order frequency from shared IP (3 recent)', 'points' => 14],
+            ['key' => 'disposable_email', 'label' => 'Disposable or suspicious email domain', 'points' => 8],
         ], $order->risk_signals);
         $this->assertSame(
             'Manual review required due to billing/shipping country mismatch (UNITED KINGDOM vs ROMANIA), High basket value exceeds GBP 2,000, and High order frequency from shared IP (3 recent); OpenRouter is not configured.',

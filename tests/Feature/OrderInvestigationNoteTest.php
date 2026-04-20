@@ -34,10 +34,10 @@ final class OrderInvestigationNoteTest extends TestCase
             'risk_score' => 91.0,
             'ai_investigation_note' => 'The order shows a country mismatch, elevated value, and repeat IP activity that merits review.',
             'risk_signals' => [
-                'Billing/shipping country mismatch (UNITED KINGDOM vs ROMANIA)',
-                'High basket value exceeds GBP 2,000',
-                'High order frequency from shared IP (3 recent)',
-                'Disposable or suspicious email domain',
+                ['key' => 'country_mismatch', 'label' => 'Billing/shipping country mismatch (UNITED KINGDOM vs ROMANIA)', 'points' => 34],
+                ['key' => 'high_basket', 'label' => 'High basket value exceeds GBP 2,000', 'points' => 16],
+                ['key' => 'shared_ip', 'label' => 'High order frequency from shared IP (3 recent)', 'points' => 14],
+                ['key' => 'disposable_email', 'label' => 'Disposable or suspicious email domain', 'points' => 8],
             ],
         ]);
 
@@ -117,8 +117,8 @@ final class OrderInvestigationNoteTest extends TestCase
             'risk_score' => 72.0,
             'ai_investigation_note' => 'Stale fallback note.',
             'risk_signals' => [
-                'Billing/shipping country mismatch (UNITED KINGDOM vs ROMANIA)',
-                'High basket value exceeds GBP 2,000',
+                ['key' => 'country_mismatch', 'label' => 'Billing/shipping country mismatch (UNITED KINGDOM vs ROMANIA)', 'points' => 34],
+                ['key' => 'high_basket', 'label' => 'High basket value exceeds GBP 2,000', 'points' => 16],
             ],
         ]);
 
@@ -140,10 +140,10 @@ final class OrderInvestigationNoteTest extends TestCase
 
         $this->assertSame(93.0, $order->risk_score);
         $this->assertSame([
-            'Billing/shipping country mismatch (UNITED KINGDOM vs ROMANIA)',
-            'High basket value exceeds GBP 2,000',
-            'High order frequency from shared IP (3 recent)',
-            'Disposable or suspicious email domain',
+            ['key' => 'country_mismatch', 'label' => 'Billing/shipping country mismatch (UNITED KINGDOM vs ROMANIA)', 'points' => 34],
+            ['key' => 'high_basket', 'label' => 'High basket value exceeds GBP 2,000', 'points' => 16],
+            ['key' => 'shared_ip', 'label' => 'High order frequency from shared IP (3 recent)', 'points' => 14],
+            ['key' => 'disposable_email', 'label' => 'Disposable or suspicious email domain', 'points' => 8],
         ], $order->risk_signals);
         $this->assertSame(
             'The refreshed summary confirms a cross-border high-value order with repeated IP activity.',

@@ -141,7 +141,7 @@ final class OpenRouterRiskAnalyzer
     private function buildFallbackNote(OrderRiskProfile $profile, string $status): string
     {
         $signals = array_values(array_filter(array_map(
-            static fn (string $signal): string => trim(rtrim($signal, '.')),
+            static fn (array $signal): string => trim(rtrim((string) ($signal['label'] ?? ''), '.')),
             $profile->signals,
         )));
 
