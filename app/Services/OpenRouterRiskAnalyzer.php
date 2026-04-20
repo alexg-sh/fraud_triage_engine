@@ -44,6 +44,7 @@ final class OpenRouterRiskAnalyzer
                 ->acceptJson()
                 ->post('/chat/completions', [
                     'model' => (string) config('services.openrouter.model'),
+                    'max_tokens' => (int) config('services.openrouter.max_tokens'),
                     'response_format' => ['type' => 'json_object'],
                     'messages' => [
                         [

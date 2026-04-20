@@ -11,9 +11,11 @@ services:
       APP_URL: http://localhost:8000
       DB_CONNECTION: sqlite
       DB_DATABASE: /var/www/html/storage/database/database.sqlite
+      DB_BUSY_TIMEOUT: "5000"
+      DB_JOURNAL_MODE: WAL
       QUEUE_CONNECTION: database
-      CACHE_STORE: database
-      SESSION_DRIVER: database
+      CACHE_STORE: file
+      SESSION_DRIVER: file
     ports:
       - "8000:8000"
     volumes:
@@ -32,9 +34,11 @@ services:
       APP_URL: http://localhost:8000
       DB_CONNECTION: sqlite
       DB_DATABASE: /var/www/html/storage/database/database.sqlite
+      DB_BUSY_TIMEOUT: "5000"
+      DB_JOURNAL_MODE: WAL
       QUEUE_CONNECTION: database
-      CACHE_STORE: database
-      SESSION_DRIVER: database
+      CACHE_STORE: file
+      SESSION_DRIVER: file
     volumes:
       - app-storage:/var/www/html/storage
     command: php artisan queue:work database --queue=triage,default --tries=1 --sleep=1

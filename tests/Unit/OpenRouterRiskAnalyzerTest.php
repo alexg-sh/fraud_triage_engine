@@ -18,6 +18,7 @@ final class OpenRouterRiskAnalyzerTest extends TestCase
     {
         Config::set('services.openrouter.api_key', 'test-key');
         Config::set('services.openrouter.model', 'openai/gpt-4.1-mini');
+        Config::set('services.openrouter.max_tokens', 180);
 
         Http::fake([
             'https://openrouter.ai/api/v1/chat/completions' => Http::response([
@@ -39,6 +40,12 @@ final class OpenRouterRiskAnalyzerTest extends TestCase
         $profile = new OrderRiskProfile(65.0, ['Country mismatch'], ['recent_same_ip_orders' => 4]);
 
         $result = app(OpenRouterRiskAnalyzer::class)->analyze($order, $profile);
+
+        Http::assertSent(function (\Illuminate\Http\Client\Request $request): bool {
+            return $request['model'] === 'openai/gpt-4.1-mini'
+                && $request['max_tokens'] === 180
+                && $request['response_format']['type'] === 'json_object';
+        });
 
         $this->assertSame(88.0, $result->riskScore);
         $this->assertSame(

@@ -37,6 +37,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -95,6 +96,8 @@ const timestamp = new Intl.DateTimeFormat('en-GB', {
   dateStyle: 'medium',
   timeStyle: 'short',
 });
+
+const investigationRequestTimeoutMs = 8000;
 
 export default function OrdersDashboard({ orders, stats, flash }: DashboardProps) {
   const { url } = usePage();
@@ -289,6 +292,15 @@ function InvestigationNoteDialog({
   const [riskScore, setRiskScore] = useState(order.risk_score);
   const [status, setStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>(order.ai_investigation_note ? 'ready' : 'idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [requestNonce, setRequestNonce] = useState(0);
+
+  useEffect(() => {
+    setNote(order.ai_investigation_note);
+    setRiskScore(order.risk_score);
+    setStatus(order.ai_investigation_note ? 'ready' : 'idle');
+    setErrorMessage(null);
+    setRequestNonce(0);
+  }, [order.ai_investigation_note, order.id, order.risk_score]);
 
   useEffect(() => {
     if (!open || note !== null || status === 'loading') {
@@ -302,7 +314,11 @@ function InvestigationNoteDialog({
       setErrorMessage(null);
 
       try {
-        const response = await axios.post(`/orders/${order.id}/investigation-note`);
+        const response = await axios.post(
+          `/orders/${order.id}/investigation-note`,
+          {},
+          { timeout: investigationRequestTimeoutMs },
+        );
         const investigationNote = response.data?.data?.ai_investigation_note ?? null;
         const returnedRiskScore = Number(response.data?.data?.risk_score ?? order.risk_score);
 
@@ -311,15 +327,24 @@ function InvestigationNoteDialog({
         }
 
         setRiskScore(returnedRiskScore);
-        setNote(typeof investigationNote === 'string' ? investigationNote : null);
-        setStatus('ready');
+        if (typeof investigationNote === 'string' && investigationNote.trim() !== '') {
+          setNote(investigationNote);
+          setStatus('ready');
+
+          return;
+        }
+
+        setErrorMessage('No investigation summary was returned for this order.');
+        setStatus('error');
       } catch (error) {
         if (cancelled) {
           return;
         }
 
         const message = axios.isAxiosError(error)
-          ? (error.response?.data?.message as string | undefined) ?? error.message
+          ? error.code === 'ECONNABORTED'
+            ? 'AI analysis timed out. Try again.'
+            : (error.response?.data?.message as string | undefined) ?? error.message
           : 'Unable to load investigation note.';
 
         setErrorMessage(message);
@@ -332,9 +357,14 @@ function InvestigationNoteDialog({
     return () => {
       cancelled = true;
     };
-  }, [note, open, order.id, order.risk_score, status]);
+  }, [note, open, order.id, order.risk_score, requestNonce, status]);
 
   const badgeVariant = riskScore >= 50 ? 'destructive' : 'secondary';
+  const retry = () => {
+    setStatus('idle');
+    setErrorMessage(null);
+    setRequestNonce((value) => value + 1);
+  };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -354,7 +384,9 @@ function InvestigationNoteDialog({
           <Alert>
             <AppIcon icon={AiBrain03Icon} />
             <AlertTitle>Generating note</AlertTitle>
-            <AlertDescription>Fetching the investigation summary for this order now.</AlertDescription>
+            <AlertDescription>
+              Fetching the investigation summary for this order now. This usually completes within a few seconds.
+            </AlertDescription>
           </Alert>
         ) : null}
 
@@ -380,6 +412,14 @@ function InvestigationNoteDialog({
           <ContextTile icon={Location01Icon} label="Billing address" value={order.billing_address} />
           <ContextTile icon={Location01Icon} label="Shipping address" value={order.shipping_address} />
         </div>
+
+        {status === 'error' ? (
+          <DialogFooter>
+            <Button variant="outline" onClick={retry}>
+              Retry note request
+            </Button>
+          </DialogFooter>
+        ) : null}
       </DialogContent>
     </Dialog>
   );
@@ -502,8 +542,16 @@ function getRouteMeta(order: OrderRow): { label: string; detail: string; variant
     };
   }
 
+   if (billingCountry !== null && shippingCountry !== null && billingCountry === shippingCountry) {
+    return {
+      label: 'Domestic',
+      detail: formatRouteCountries(billingCountry, shippingCountry, billingFlag, shippingFlag) ?? `${shippingFlag} ${shippingCountry}`,
+      variant: 'secondary',
+    };
+  }
+
   return {
-    label: 'Mismatch',
+    label: 'Unclear',
     detail: formatRouteCountries(billingCountry, shippingCountry, billingFlag, shippingFlag) ?? shippingCountry ?? 'Address changed',
     variant: 'outline',
   };

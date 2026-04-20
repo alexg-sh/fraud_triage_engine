@@ -42,6 +42,7 @@ return [
         'api_key' => env('OPENROUTER_API_KEY'),
         'model' => env('OPENROUTER_MODEL', 'openai/gpt-4.1-mini'),
         'timeout' => (int) env('OPENROUTER_TIMEOUT', 20),
+        'max_tokens' => (int) env('OPENROUTER_MAX_TOKENS', 180),
         'site_url' => env('OPENROUTER_SITE_URL', env('APP_URL', 'http://localhost')),
         'site_name' => env('OPENROUTER_SITE_NAME', env('APP_NAME', 'Fraud Triage Engine')),
     ],
