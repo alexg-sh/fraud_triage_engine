@@ -7,6 +7,7 @@ namespace Tests\Feature;
 use App\Models\Order;
 use Inertia\Testing\AssertableInertia as Assert;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
@@ -40,6 +41,31 @@ final class OrdersDashboardTest extends TestCase
                     'orders.data.0.ai_investigation_note',
                     'Chargeback risk is elevated because the address pair conflicts with the order value.',
                 )
+            );
+    }
+
+    public function test_review_filter_returns_only_orders_requiring_review(): void
+    {
+        Queue::fake();
+
+        Order::factory()->create([
+            'risk_score' => 91.0,
+            'ai_investigation_note' => 'Combined signals require manual review.',
+        ]);
+
+        Order::factory()->create([
+            'risk_score' => 12.5,
+            'ai_investigation_note' => null,
+        ]);
+
+        $response = $this->get('/orders?filter=review');
+
+        $response
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('orders/dashboard')
+                ->where('orders.data.0.requires_review', true)
+                ->where('orders.data', fn (Collection $orders): bool => $orders->count() === 1)
             );
     }
 }
