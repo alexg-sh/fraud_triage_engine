@@ -1,6 +1,7 @@
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import axios from 'axios';
 import { type FormEvent, useEffect, useState, type ReactNode } from 'react';
+import { toast } from 'sonner';
 import {
   Activity01Icon,
   AiBrain03Icon,
@@ -158,6 +159,14 @@ export default function OrdersDashboard({ orders, stats, flash }: DashboardProps
     setOrderOverrides({});
   }, [orders.data]);
 
+  useEffect(() => {
+    if (!flash?.status) {
+      return;
+    }
+
+    toast.success(flash.status);
+  }, [flash?.status]);
+
   const visibleOrders = orders.data.map((order) => ({
     ...order,
     ...(orderOverrides[order.id] ?? {}),
@@ -275,14 +284,6 @@ export default function OrdersDashboard({ orders, stats, flash }: DashboardProps
               </div>
             </CardContent>
           </Card>
-
-          {flash?.status ? (
-            <Alert className="py-3">
-              <AppIcon icon={AiBrain03Icon} />
-              <AlertTitle>Queue update</AlertTitle>
-              <AlertDescription>{flash.status}</AlertDescription>
-            </Alert>
-          ) : null}
 
           <Card size="sm" className="bg-card/95 shadow-xl shadow-black/5">
             <CardHeader>
@@ -531,7 +532,6 @@ export default function OrdersDashboard({ orders, stats, flash }: DashboardProps
                                 <OrderReviewDialog
                                   order={order}
                                   routeLabel={route.label}
-                                  triggerLabel="Open"
                                   onOrderPatch={applyOrderPatch}
                                 />
                               ) : (
@@ -567,12 +567,10 @@ export default function OrdersDashboard({ orders, stats, flash }: DashboardProps
 function OrderReviewDialog({
   order,
   routeLabel,
-  triggerLabel,
   onOrderPatch,
 }: {
   order: OrderRow;
   routeLabel: string;
-  triggerLabel: string;
   onOrderPatch: (orderId: number, patch: OrderPatch) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -743,7 +741,7 @@ function OrderReviewDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger render={<Button variant={requiresReview ? 'destructive' : 'outline'} size="xs" />}>
-        {triggerLabel}
+        Open
       </DialogTrigger>
       <DialogContent className="max-w-3xl gap-4 sm:gap-5">
         <DialogHeader>

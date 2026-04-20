@@ -1,5 +1,5 @@
 import { Head, Link, usePage } from '@inertiajs/react';
-import type { ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import {
   Alert01Icon,
   Clock01Icon,
@@ -9,6 +9,7 @@ import {
   TaskDone01Icon,
 } from '@hugeicons/core-free-icons';
 import type { IconSvgElement } from '@hugeicons/core-free-icons';
+import { toast } from 'sonner';
 
 import { AppIcon } from '@/components/app-icon';
 import { OperationsLayout } from '@/components/operations-layout';
@@ -85,6 +86,14 @@ export default function QueueMonitor({
     only: ['stats', 'pendingJobs', 'failedJobs', 'recentTriagedOrders', 'runtime', 'demoJob'],
   });
 
+  useEffect(() => {
+    if (!flash?.status) {
+      return;
+    }
+
+    toast.success(flash.status);
+  }, [flash?.status]);
+
   return (
     <>
       <Head title="Queue Monitor" />
@@ -124,14 +133,6 @@ export default function QueueMonitor({
               </div>
             </CardContent>
           </Card>
-
-          {flash?.status ? (
-            <Alert>
-              <AppIcon icon={TaskDone01Icon} />
-              <AlertTitle>Queue update</AlertTitle>
-              <AlertDescription>{flash.status}</AlertDescription>
-            </Alert>
-          ) : null}
 
           {!runtime.horizon_available ? (
             <Alert>
