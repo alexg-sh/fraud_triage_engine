@@ -15,24 +15,9 @@ final class OrderInvestigationNoteTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_note_is_generated_only_when_requested(): void
+    public function test_controller_returns_persisted_note_without_regenerating_it(): void
     {
         Queue::fake();
-
-        Config::set('services.openrouter.api_key', 'test-key');
-        Config::set('services.openrouter.model', 'openai/gpt-4.1-mini');
-
-        Http::fake([
-            'https://openrouter.ai/api/v1/chat/completions' => Http::response([
-                'choices' => [
-                    [
-                        'message' => [
-                            'content' => '{"risk_score":91,"investigation_note":"The order shows a country mismatch, elevated value, and repeat IP activity that merits review."}',
-                        ],
-                    ],
-                ],
-            ]),
-        ]);
 
         Order::factory()->count(3)->create([
             'ip_address' => '203.0.113.50',
@@ -46,9 +31,17 @@ final class OrderInvestigationNoteTest extends TestCase
             'total_amount' => 2450.00,
             'billing_address' => '221B Baker Street, London, United Kingdom',
             'shipping_address' => '1 Courier Way, Bucharest, Romania',
-            'risk_score' => 72.0,
-            'ai_investigation_note' => null,
+            'risk_score' => 91.0,
+            'ai_investigation_note' => 'The order shows a country mismatch, elevated value, and repeat IP activity that merits review.',
+            'risk_signals' => [
+                'Billing/shipping country mismatch (UNITED KINGDOM vs ROMANIA)',
+                'High basket value exceeds GBP 2,000',
+                'High order frequency from shared IP (3 recent)',
+                'Disposable or suspicious email domain',
+            ],
         ]);
+
+        Http::fake();
 
         $response = $this->postJson("/orders/{$order->id}/investigation-note");
 
@@ -56,28 +49,15 @@ final class OrderInvestigationNoteTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.id', $order->id)
             ->assertJsonPath('data.requires_review', true)
-            ->assertSessionHas(
-                "order_investigation_notes.{$order->id}.note",
-                'The order shows a country mismatch, elevated value, and repeat IP activity that merits review.',
-            )
             ->assertJsonPath(
                 'data.ai_investigation_note',
                 'The order shows a country mismatch, elevated value, and repeat IP activity that merits review.',
             );
 
-        $order->refresh();
-
-        $this->assertSame(91.0, $order->risk_score);
-        $this->assertSame([
-            'Billing/shipping country mismatch (UNITED KINGDOM vs ROMANIA)',
-            'High basket value exceeds GBP 2,000',
-            'High order frequency from shared IP (3 recent)',
-            'Disposable or suspicious email domain',
-        ], $order->risk_signals);
-        $this->assertNull($order->ai_investigation_note);
+        Http::assertNothingSent();
     }
 
-    public function test_low_risk_order_does_not_trigger_ai_when_note_is_requested(): void
+    public function test_low_risk_order_returns_without_triggering_ai(): void
     {
         Queue::fake();
         Http::fake();
@@ -97,14 +77,13 @@ final class OrderInvestigationNoteTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.id', $order->id)
             ->assertJsonPath('data.requires_review', false)
-            ->assertSessionMissing("order_investigation_notes.{$order->id}")
             ->assertJsonPath('data.ai_investigation_note', null);
 
         Http::assertNothingSent();
         $this->assertSame([], $order->fresh()->risk_signals);
     }
 
-    public function test_existing_note_can_be_refreshed_on_request(): void
+    public function test_note_can_be_refreshed_on_request(): void
     {
         Queue::fake();
 
@@ -136,18 +115,14 @@ final class OrderInvestigationNoteTest extends TestCase
             'billing_address' => '221B Baker Street, London, United Kingdom',
             'shipping_address' => '1 Courier Way, Bucharest, Romania',
             'risk_score' => 72.0,
-            'ai_investigation_note' => null,
+            'ai_investigation_note' => 'Stale fallback note.',
+            'risk_signals' => [
+                'Billing/shipping country mismatch (UNITED KINGDOM vs ROMANIA)',
+                'High basket value exceeds GBP 2,000',
+            ],
         ]);
 
         $response = $this
-            ->withSession([
-                'order_investigation_notes' => [
-                    $order->id => [
-                        'note' => 'Stale fallback note.',
-                        'risk_score' => 72.0,
-                    ],
-                ],
-            ])
             ->postJson("/orders/{$order->id}/investigation-note", [
                 'refresh' => true,
             ]);
@@ -156,10 +131,6 @@ final class OrderInvestigationNoteTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.id', $order->id)
             ->assertJsonPath('data.risk_score', 93)
-            ->assertSessionHas(
-                "order_investigation_notes.{$order->id}.note",
-                'The refreshed summary confirms a cross-border high-value order with repeated IP activity.',
-            )
             ->assertJsonPath(
                 'data.ai_investigation_note',
                 'The refreshed summary confirms a cross-border high-value order with repeated IP activity.',
@@ -174,6 +145,9 @@ final class OrderInvestigationNoteTest extends TestCase
             'High order frequency from shared IP (3 recent)',
             'Disposable or suspicious email domain',
         ], $order->risk_signals);
-        $this->assertNull($order->ai_investigation_note);
+        $this->assertSame(
+            'The refreshed summary confirms a cross-border high-value order with repeated IP activity.',
+            $order->ai_investigation_note,
+        );
     }
 }

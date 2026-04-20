@@ -33,13 +33,7 @@ final class ResetDemoDataTest extends TestCase
             'total_runs' => 5,
         ]);
 
-        $response = $this
-            ->withSession([
-                'order_investigation_notes' => [
-                    1 => ['note' => 'stale note'],
-                ],
-            ])
-            ->post('/orders/reset-demo-data');
+        $response = $this->post('/orders/reset-demo-data');
 
         $response
             ->assertRedirect('/orders')
@@ -49,6 +43,5 @@ final class ResetDemoDataTest extends TestCase
         $this->assertSame(0, DB::table('jobs')->count());
         $this->assertFalse(Cache::has('demo_queue.total_runs'));
         $this->assertFalse(Cache::has('demo_queue.last_run'));
-        $this->assertFalse(session()->has('order_investigation_notes'));
     }
 }

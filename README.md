@@ -2,6 +2,94 @@
 
 Laravel 11 demo application for asynchronous fraud review. Orders are stored in SQLite, triaged through either a database-backed queue worker or Redis Horizon, monitored in an operations dashboard, and reviewed in an Inertia React UI built with `shadcn/ui`.
 
+## Assignment Fit
+
+This project was built to satisfy a technical interview assignment focused on agentic coding and modern PHP workflows. It demonstrates:
+
+- A real Laravel application with clear background-processing use cases
+- Queued jobs for order triage and demo queue activity
+- Iterative development with an AI coding assistant used for implementation, review, and refinement
+- A codebase that is still explainable and defendable without treating AI output as final by default
+
+## AI Tool And Setup
+
+- AI tool used: `Codex CLI`
+- How it was used:
+  - repository exploration and architecture iteration
+  - controller, job, test, and UI implementation
+  - debugging failing flows and tightening queue-driven behavior
+  - README and submission preparation
+- Working style:
+  - I used the AI conversationally rather than as a copy-paste generator
+  - I guided the implementation, challenged weak suggestions, and adjusted the product scope as the codebase evolved
+  - I kept the AI focused on concrete repository changes, then verified behavior with tests and build output
+
+## Development Approach
+
+The development approach was to pick a project where queued jobs are core to the user experience, not an afterthought. Fraud triage was a good fit because it naturally separates:
+
+- synchronous order intake
+- asynchronous heuristic scoring
+- on-demand analyst enrichment
+- operational visibility into queued work
+
+The build process followed a practical loop:
+
+1. Define the user-facing workflow and queue boundaries.
+2. Implement the Laravel backend and job pipeline.
+3. Add operations visibility so queued work can be demonstrated clearly.
+4. Add tests around job dispatch, scoring, note generation, and analyst actions.
+5. Refine the UI to make the system easy to explain during a demo.
+
+## Architectural Decisions
+
+### Why This Project
+
+Fraud review is a strong assignment fit because it has obvious background-processing needs. Orders can be accepted immediately, scored asynchronously, inspected by an analyst later, and monitored through a queue dashboard.
+
+### Queue Design
+
+- `ProcessOrderTriage` handles asynchronous risk scoring for new orders
+- `DemoQueuePulse` provides visible non-triage background work for demos
+- The application works with the database queue by default, with optional Redis Horizon support for a richer operations path
+
+This was intentional: the database queue keeps local setup simple, while Horizon demonstrates that the same application can move to a more production-style operational model.
+
+### Risk Analysis Design
+
+- Heuristic scoring runs first and produces a deterministic baseline score
+- AI analysis is not triggered on every order automatically
+- OpenRouter analysis runs only when an analyst opens a flagged order and wants more context
+
+That decision keeps queued processing meaningful without making the system dependent on AI for every request. It also makes the trade-off easier to justify: heuristics drive the workflow, AI supports analyst review.
+
+### Analyst Workflow Design
+
+- Orders can be filtered by review status, risk band, search terms, and analyst decision state
+- Investigation notes are cached in session for the current review flow
+- Final analyst decisions are stored on the order record with a timestamp and optional note
+
+This gives the demo a full operational lifecycle instead of stopping at “job completed successfully.”
+
+### Demoability
+
+The application includes:
+
+- demo order batching
+- demo queue jobs
+- reset actions
+- queue-monitor visibility
+- optional local Horizon bootstrapping
+
+These pieces were added so the application is easy to show live in an interview setting without relying on stale seeded data alone.
+
+## Key Discoveries
+
+- The best queued-job demo is one where the user can actually see work moving through the system. That led to the queue monitor, demo jobs, and visible job-drain behavior.
+- Always-on AI generation was a weaker design than analyst-triggered AI enrichment. On-demand generation made the architecture easier to explain and cheaper to operate.
+- Submission quality depends on the process being visible. Tests, queue visibility, and README clarity matter as much as the raw feature list for this assignment.
+- The database queue is a useful default for local development, but adding optional Horizon support makes the project more credible as a modern operations-focused PHP application.
+
 ## Stack
 
 - Backend: Laravel 11, PHP 8.5
@@ -23,6 +111,15 @@ Laravel 11 demo application for asynchronous fraud review. Orders are stored in 
 - Stores heuristic risk scores asynchronously. OpenRouter analysis is requested only when an analyst opens a flagged order.
 - Seeds 1,000 synthetic orders with a 95/5 normal-to-suspicious split.
 - Exposes a dashboard at `/orders`, a queue monitor at `/queue-monitor`, and Horizon at `/horizon` when Redis is configured.
+
+## How It Showcases Queued Jobs
+
+- New orders dispatch `ProcessOrderTriage` onto the `triage` queue
+- Demo activity can dispatch `DemoQueuePulse` onto the `default` queue
+- The queue monitor exposes pending jobs, failures, recent processing activity, and demo job runs
+- Local development can use either the database-backed worker path or Redis Horizon
+
+This makes queued work central to the application rather than a hidden implementation detail.
 
 ## Docker Setup
 

@@ -12,8 +12,6 @@ use Illuminate\Http\Request;
 
 final class OrderInvestigationNoteController extends Controller
 {
-    private const SESSION_NOTES_KEY = 'order_investigation_notes';
-
     public function __invoke(
         Request $request,
         Order $order,
@@ -21,18 +19,26 @@ final class OrderInvestigationNoteController extends Controller
         OpenRouterRiskAnalyzer $analyzer,
     ): JsonResponse {
         $refresh = $request->boolean('refresh');
-        /** @var array<int, array{note?: string, risk_score?: float|int}> $sessionNotes */
-        $sessionNotes = $request->session()->get(self::SESSION_NOTES_KEY, []);
+
+        if (! $refresh) {
+            return response()->json([
+                'data' => [
+                    'id' => $order->id,
+                    'risk_score' => (float) $order->risk_score,
+                    'requires_review' => $order->requiresReview(),
+                    'ai_investigation_note' => $order->ai_investigation_note,
+                ],
+            ]);
+        }
+
         $profile = $scorer->score($order);
 
-        $order->forceFill([
-            'risk_score' => $profile->score,
-            'risk_signals' => $profile->signals,
-        ])->save();
-
         if (! $profile->shouldEscalate()) {
-            unset($sessionNotes[$order->id]);
-            $request->session()->put(self::SESSION_NOTES_KEY, $sessionNotes);
+            $order->forceFill([
+                'risk_score' => $profile->score,
+                'risk_signals' => $profile->signals,
+                'ai_investigation_note' => null,
+            ])->save();
 
             return response()->json([
                 'data' => [
@@ -44,42 +50,20 @@ final class OrderInvestigationNoteController extends Controller
             ]);
         }
 
-        $cachedNote = $sessionNotes[$order->id]['note'] ?? null;
-
-        if (
-            ! $refresh
-            && is_string($cachedNote)
-            && trim($cachedNote) !== ''
-        ) {
-            return response()->json([
-                'data' => [
-                    'id' => $order->id,
-                    'risk_score' => (float) $order->risk_score,
-                    'requires_review' => true,
-                    'ai_investigation_note' => $cachedNote,
-                ],
-            ]);
-        }
-
         $analysis = $analyzer->analyze($order, $profile);
 
         $order->forceFill([
             'risk_score' => $analysis->riskScore,
             'risk_signals' => $profile->signals,
+            'ai_investigation_note' => $analysis->investigationNote,
         ])->save();
-
-        $sessionNotes[$order->id] = [
-            'note' => $analysis->investigationNote,
-            'risk_score' => $analysis->riskScore,
-        ];
-        $request->session()->put(self::SESSION_NOTES_KEY, $sessionNotes);
 
         return response()->json([
             'data' => [
                 'id' => $order->id,
                 'risk_score' => $analysis->riskScore,
                 'requires_review' => true,
-                'ai_investigation_note' => $analysis->investigationNote,
+                'ai_investigation_note' => $order->ai_investigation_note,
             ],
         ]);
     }

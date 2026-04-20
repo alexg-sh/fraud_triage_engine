@@ -517,8 +517,8 @@ function OrderReviewDialog({
   const [decisionStatus, setDecisionStatus] = useState<DecisionStatus>(order.decision_status);
   const [decisionNoteInput, setDecisionNoteInput] = useState(order.decision_note ?? '');
   const [decisionedAt, setDecisionedAt] = useState(order.decisioned_at);
-  const [status, setStatus] = useState<'idle' | 'loading' | 'ready' | 'error' | 'not-needed'>(
-    order.requires_review ? (order.ai_investigation_note ? 'ready' : 'idle') : 'not-needed',
+  const [status, setStatus] = useState<'idle' | 'loading' | 'ready' | 'error' | 'not-needed' | 'pending'>(
+    order.requires_review ? (order.ai_investigation_note ? 'ready' : 'pending') : 'not-needed',
   );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [requestNonce, setRequestNonce] = useState(0);
@@ -532,7 +532,7 @@ function OrderReviewDialog({
     setDecisionStatus(order.decision_status);
     setDecisionNoteInput(order.decision_note ?? '');
     setDecisionedAt(order.decisioned_at);
-    setStatus(order.requires_review ? (order.ai_investigation_note ? 'ready' : 'idle') : 'not-needed');
+    setStatus(order.requires_review ? (order.ai_investigation_note ? 'ready' : 'pending') : 'not-needed');
     setErrorMessage(null);
     setRequestNonce(0);
     setRefreshing(false);
@@ -548,7 +548,7 @@ function OrderReviewDialog({
   ]);
 
   useEffect(() => {
-    if (!open || !requiresReview || status === 'loading' || (note !== null && !refreshing) || status === 'not-needed') {
+    if (!open || !refreshing || !requiresReview || status === 'loading' || status === 'not-needed') {
       return;
     }
 
@@ -625,15 +625,12 @@ function OrderReviewDialog({
     return () => {
       cancelled = true;
     };
-  }, [note, onOrderPatch, open, order.id, order.risk_score, refreshing, requestNonce, requiresReview, status]);
+  }, [onOrderPatch, open, order.id, order.risk_score, refreshing, requestNonce, requiresReview, status]);
 
   const retry = () => {
-    setRefreshing(note !== null);
+    setRefreshing(true);
     setStatus('idle');
     setErrorMessage(null);
-    if (note !== null) {
-      setNote(null);
-    }
     setRequestNonce((value) => value + 1);
   };
 
@@ -693,16 +690,16 @@ function OrderReviewDialog({
           </div>
           <DialogTitle>Analyst review workspace</DialogTitle>
           <DialogDescription>
-            Review the scored signals, generate the AI summary when needed, and record a final analyst decision.
+            Review the queued triage results, inspect the AI summary, and record a final analyst decision.
           </DialogDescription>
         </DialogHeader>
 
         {status === 'loading' ? (
           <Alert>
             <AppIcon icon={AiBrain03Icon} />
-            <AlertTitle>Generating note</AlertTitle>
+            <AlertTitle>Refreshing note</AlertTitle>
             <AlertDescription>
-              Fetching the investigation summary for this order now. This usually completes within a few seconds.
+              Re-running AI analysis for this order now. This usually completes within a few seconds.
             </AlertDescription>
           </Alert>
         ) : null}
@@ -721,6 +718,17 @@ function OrderReviewDialog({
             <AlertTitle>No AI note required</AlertTitle>
             <AlertDescription>
               This order is currently below the manual-review threshold. The analyst decision controls are still available.
+            </AlertDescription>
+          </Alert>
+        ) : null}
+
+        {status === 'pending' ? (
+          <Alert>
+            <AppIcon icon={AiBrain03Icon} />
+            <AlertTitle>AI note pending</AlertTitle>
+            <AlertDescription>
+              Triage has marked this order for manual review, but the queued AI summary is not available yet. Wait for the job
+              to finish or refresh the note manually.
             </AlertDescription>
           </Alert>
         ) : null}
@@ -798,7 +806,7 @@ function OrderReviewDialog({
         <DialogFooter showCloseButton>
           {requiresReview ? (
             <Button type="button" variant="outline" onClick={retry}>
-              Refresh AI response
+              Refresh AI note
             </Button>
           ) : null}
         </DialogFooter>

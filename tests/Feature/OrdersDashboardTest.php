@@ -15,7 +15,7 @@ final class OrdersDashboardTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_dashboard_renders_review_badge_and_session_note(): void
+    public function test_dashboard_renders_review_badge_and_persisted_note(): void
     {
         Queue::fake();
 
@@ -29,14 +29,7 @@ final class OrdersDashboardTest extends TestCase
             'ai_investigation_note' => null,
         ]);
 
-        $response = $this->withSession([
-            'order_investigation_notes' => [
-                $order->id => [
-                    'note' => 'Chargeback risk is elevated because the address pair conflicts with the order value.',
-                    'risk_score' => 82.4,
-                ],
-            ],
-        ])->get('/orders');
+        $response = $this->get('/orders');
 
         $response
             ->assertOk()
@@ -50,25 +43,6 @@ final class OrdersDashboardTest extends TestCase
                     'orders.data.0.ai_investigation_note',
                     'Chargeback risk is elevated because the address pair conflicts with the order value.',
                 )
-            );
-    }
-
-    public function test_dashboard_ignores_database_note_without_session_cache(): void
-    {
-        Queue::fake();
-
-        Order::factory()->create([
-            'risk_score' => 82.4,
-            'ai_investigation_note' => 'Stale database note.',
-        ]);
-
-        $response = $this->get('/orders');
-
-        $response
-            ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page
-                ->component('orders/dashboard')
-                ->where('orders.data.0.ai_investigation_note', null)
             );
     }
 

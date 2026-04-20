@@ -11,12 +11,8 @@ use Inertia\Response;
 
 final class OrderDashboardController extends Controller
 {
-    private const SESSION_NOTES_KEY = 'order_investigation_notes';
-
     public function __invoke(Request $request): Response
     {
-        /** @var array<int, array{note?: string, risk_score?: float|int}> $sessionNotes */
-        $sessionNotes = $request->session()->get(self::SESSION_NOTES_KEY, []);
         $ordersQuery = Order::query();
         $search = trim($request->string('search')->value());
         $decision = $request->string('decision')->value();
@@ -68,7 +64,7 @@ final class OrderDashboardController extends Controller
                 'shipping_address' => $order->shipping_address,
                 'risk_score' => round($order->risk_score, 1),
                 'risk_signals' => array_values($order->risk_signals ?? []),
-                'ai_investigation_note' => $this->resolveSessionNote($sessionNotes, $order->id),
+                'ai_investigation_note' => $order->ai_investigation_note,
                 'requires_review' => $order->requiresReview(),
                 'decision_status' => $order->decision_status,
                 'decision_note' => $order->decision_note,
@@ -89,15 +85,5 @@ final class OrderDashboardController extends Controller
                     ->count(),
             ],
         ]);
-    }
-
-    /**
-     * @param array<int, array{note?: string, risk_score?: float|int}> $sessionNotes
-     */
-    private function resolveSessionNote(array $sessionNotes, int $orderId): ?string
-    {
-        $note = $sessionNotes[$orderId]['note'] ?? null;
-
-        return is_string($note) && trim($note) !== '' ? $note : null;
     }
 }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Jobs;
 
 use App\Models\Order;
+use App\Services\OpenRouterRiskAnalyzer;
 use App\Services\OrderRiskScorer;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -23,7 +24,7 @@ final class ProcessOrderTriage implements ShouldQueue
         $this->queue = 'triage';
     }
 
-    public function handle(OrderRiskScorer $scorer): void
+    public function handle(OrderRiskScorer $scorer, OpenRouterRiskAnalyzer $analyzer): void
     {
         $order = Order::query()->find($this->orderId);
 
@@ -39,11 +40,22 @@ final class ProcessOrderTriage implements ShouldQueue
 
         $profile = $scorer->score($order);
 
+        if (! $profile->shouldEscalate()) {
+            $order->forceFill([
+                'risk_score' => $profile->score,
+                'risk_signals' => $profile->signals,
+                'ai_investigation_note' => null,
+            ])->save();
+
+            return;
+        }
+
+        $analysis = $analyzer->analyze($order, $profile);
+
         $order->forceFill([
-            'risk_score' => $profile->score,
+            'risk_score' => $analysis->riskScore,
             'risk_signals' => $profile->signals,
-            // AI notes are generated on demand when an analyst opens the order.
-            'ai_investigation_note' => null,
+            'ai_investigation_note' => $analysis->investigationNote,
         ])->save();
     }
 }
