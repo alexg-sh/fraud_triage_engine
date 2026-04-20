@@ -14,8 +14,9 @@ export default {
     theme: {
         extend: {
             fontFamily: {
-                sans: ['"Space Grotesk"', ...defaultTheme.fontFamily.sans],
-                display: ['"Instrument Serif"', 'serif'],
+                sans: ['"Geist Variable"', ...defaultTheme.fontFamily.sans],
+                display: ['"Geist Variable"', ...defaultTheme.fontFamily.sans],
+                mono: ['"JetBrains Mono Variable"', ...defaultTheme.fontFamily.mono],
             },
             colors: {
                 border: 'hsl(var(--border))',
