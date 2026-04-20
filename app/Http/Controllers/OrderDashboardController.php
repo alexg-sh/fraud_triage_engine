@@ -5,16 +5,24 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Models\Order;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
 final class OrderDashboardController extends Controller
 {
-    public function __invoke(): Response
+    public function __invoke(Request $request): Response
     {
-        $orders = Order::query()
+        $ordersQuery = Order::query();
+
+        if ($request->string('filter')->value() === 'review') {
+            $ordersQuery->where('risk_score', '>=', 50);
+        }
+
+        $orders = $ordersQuery
             ->latestFirst()
             ->paginate(25)
+            ->withQueryString()
             ->through(fn (Order $order): array => [
                 'id' => $order->id,
                 'customer_email' => $order->customer_email,
