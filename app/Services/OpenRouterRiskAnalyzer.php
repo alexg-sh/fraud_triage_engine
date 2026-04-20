@@ -7,9 +7,11 @@ namespace App\Services;
 use App\DataTransferObjects\OrderRiskProfile;
 use App\DataTransferObjects\RiskAnalysisResult;
 use App\Models\Order;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 final class OpenRouterRiskAnalyzer
@@ -26,7 +28,7 @@ final class OpenRouterRiskAnalyzer
         if ($apiKey === '') {
             return new RiskAnalysisResult(
                 riskScore: $profile->score,
-                investigationNote: 'High-risk order flagged by heuristics; configure OpenRouter to add AI review notes.',
+                investigationNote: $this->buildFallbackNote($profile, 'OpenRouter is not configured'),
             );
         }
 
@@ -65,10 +67,21 @@ final class OpenRouterRiskAnalyzer
                     ],
                 ])
                 ->throw();
-        } catch (RequestException) {
+        } catch (RequestException|ConnectionException $exception) {
+            $failureReason = $this->buildFailureReason($exception);
+
+            Log::warning('OpenRouter risk analysis failed.', [
+                'order_id' => $order->id,
+                'model' => (string) config('services.openrouter.model'),
+                'exception' => $exception::class,
+                'reason' => $failureReason,
+                'heuristic_score' => $profile->score,
+                'signals' => $profile->signals,
+            ]);
+
             return new RiskAnalysisResult(
                 riskScore: $profile->score,
-                investigationNote: 'High-risk order requires manual review; AI analysis is temporarily unavailable.',
+                investigationNote: $this->buildFallbackNote($profile, $failureReason),
             );
         }
 
@@ -122,5 +135,66 @@ final class OpenRouterRiskAnalyzer
         $parts = preg_split('/(?<=[.!?])\s+/', $note);
 
         return trim((string) ($parts[0] ?? $note));
+    }
+
+    private function buildFallbackNote(OrderRiskProfile $profile, string $status): string
+    {
+        $signals = array_values(array_filter(array_map(
+            static fn (string $signal): string => trim(rtrim($signal, '.')),
+            $profile->signals,
+        )));
+
+        if ($signals === []) {
+            return sprintf('Manual review required due to multiple fraud indicators; %s.', $status);
+        }
+
+        $summary = lcfirst($this->joinSignals(array_slice($signals, 0, 3)));
+
+        return sprintf('Manual review required due to %s; %s.', $summary, $status);
+    }
+
+    private function buildFailureReason(RequestException|ConnectionException $exception): string
+    {
+        if ($exception instanceof RequestException) {
+            $status = $exception->response->status();
+            $message = Arr::get($exception->response->json(), 'error.message')
+                ?? Arr::get($exception->response->json(), 'message');
+
+            if (is_string($message) && $message !== '') {
+                return sprintf('AI analysis failed with HTTP %d: %s', $status, $this->normalizeFragment($message));
+            }
+
+            return sprintf('AI analysis failed with HTTP %d', $status);
+        }
+
+        return sprintf(
+            'AI analysis failed: %s',
+            $this->normalizeFragment($exception->getMessage())
+        );
+    }
+
+    /**
+     * @param list<string> $signals
+     */
+    private function joinSignals(array $signals): string
+    {
+        if (count($signals) === 1) {
+            return $signals[0];
+        }
+
+        if (count($signals) === 2) {
+            return sprintf('%s and %s', $signals[0], $signals[1]);
+        }
+
+        $lastSignal = array_pop($signals);
+
+        return sprintf('%s, and %s', implode(', ', $signals), $lastSignal);
+    }
+
+    private function normalizeFragment(string $value): string
+    {
+        return trim((string) Str::of($value)
+            ->replaceMatches('/\s+/', ' ')
+            ->trim(" \t\n\r\0\x0B."));
     }
 }
