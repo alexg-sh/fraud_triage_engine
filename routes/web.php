@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\OrderDashboardController;
+use App\Http\Controllers\OrderInvestigationNoteController;
 use App\Http\Controllers\QueueMonitorController;
 use Illuminate\Support\Facades\Route;
 
@@ -17,3 +18,6 @@ Route::get('/horizon', QueueMonitorController::class)
 
 Route::post('/orders', [OrderController::class, 'store'])
     ->name('orders.store');
+
+Route::post('/orders/{order}/investigation-note', OrderInvestigationNoteController::class)
+    ->name('orders.investigation-note');

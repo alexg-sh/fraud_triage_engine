@@ -1,18 +1,17 @@
 import { Head, Link } from '@inertiajs/react';
-import type { ComponentProps } from 'react';
-import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react';
+import type { ReactNode } from 'react';
 import {
-  Activity01Icon,
   Alert01Icon,
-  ArrowRight01Icon,
   Clock01Icon,
   Database01Icon,
-  Home02Icon,
   RefreshIcon,
   Shield01Icon,
   TaskDone01Icon,
 } from '@hugeicons/core-free-icons';
+import type { IconSvgElement } from '@hugeicons/core-free-icons';
 
+import { AppIcon } from '@/components/app-icon';
+import { OperationsLayout } from '@/components/operations-layout';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -70,8 +69,8 @@ export default function QueueMonitor({
     <>
       <Head title="Queue Monitor" />
 
-      <main className="min-h-screen bg-background">
-        <div className="mx-auto flex max-w-[1380px] flex-col gap-4 px-3 py-4 sm:px-4 lg:py-5">
+      <OperationsLayout sidebarFooter={<SidebarStatus runtime={runtime}>{stats.pending_jobs} pending</SidebarStatus>}>
+        <div className="flex flex-col gap-4">
           <Card size="sm" className="bg-card/95 shadow-xl shadow-black/5">
             <CardContent className="flex flex-col gap-4 py-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="flex flex-col gap-2">
@@ -92,10 +91,6 @@ export default function QueueMonitor({
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
-                <Button render={<Link href="/orders" />} variant="outline" size="xs">
-                  <AppIcon icon={Home02Icon} data-icon="inline-start" />
-                  Orders
-                </Button>
                 <Button render={<Link href="/horizon" />} variant="outline" size="xs">
                   <AppIcon icon={RefreshIcon} data-icon="inline-start" />
                   Refresh
@@ -233,13 +228,9 @@ export default function QueueMonitor({
             </CardContent>
           </Card>
         </div>
-      </main>
+      </OperationsLayout>
     </>
   );
-}
-
-function AppIcon({ icon, className, ...props }: Omit<ComponentProps<typeof HugeiconsIcon>, 'icon'> & { icon: IconSvgElement }) {
-  return <HugeiconsIcon icon={icon} size={18} strokeWidth={1.8} className={className} {...props} />;
 }
 
 function MetricCard({
@@ -278,4 +269,24 @@ function EmptyState({ label }: { label: string }) {
 
 function formatUnix(value: number): string {
   return timestamp.format(new Date(value * 1000));
+}
+
+function SidebarStatus({
+  runtime,
+  children,
+}: {
+  runtime: QueueMonitorProps['runtime'];
+  children: ReactNode;
+}) {
+  return (
+    <div className="rounded-2xl border border-border/70 bg-background/50 px-3 py-3">
+      <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Queue status</div>
+      <div className="mt-1 text-sm font-medium text-foreground">
+        {runtime.horizon_available ? 'Horizon available' : 'Database worker mode'}
+      </div>
+      <div className="mt-1 text-xs text-muted-foreground">
+        {runtime.queue_connection} • {children}
+      </div>
+    </div>
+  );
 }

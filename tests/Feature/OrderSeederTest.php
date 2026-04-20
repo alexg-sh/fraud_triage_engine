@@ -33,6 +33,6 @@ final class OrderSeederTest extends TestCase
                 || str_ends_with($order->customer_email, '@maildrop.cc');
         })->count());
         $this->assertGreaterThan(0, $orders->where('risk_score', '>=', 50)->count());
-        $this->assertGreaterThan(0, $orders->whereNotNull('ai_investigation_note')->count());
+        $this->assertSame(0, $orders->whereNotNull('ai_investigation_note')->count());
     }
 }
