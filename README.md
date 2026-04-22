@@ -4,7 +4,13 @@ Fraud Triage Engine is a Laravel 13 app for asynchronous fraud review. Orders ar
 
 It exists to show a practical queued-job workflow in a small but explainable product. The project focuses on showing how background processing, operational visibility, and analyst review can fit together in one application instead of treating queues as hidden infrastructure.
 
-Selected user messages that shaped the build are collected in [fraud-triage-selected-user-messages.md](./fraud-triage-selected-user-messages.md).
+The raw, unedited AI conversation history submitted with this project is included in [fraud-triage-selected-user-messages.md](./fraud-triage-selected-user-messages.md).
+
+## AI Tool And Setup
+
+The AI tool used for this project was `Codex CLI`.
+
+It was set up as a repo-local development workflow where the agent could inspect the codebase, write changes directly into the project, run framework commands, iterate on tests, and help debug runtime issues in context. I used it across scaffolding, implementation, architecture discussion, testing, and debugging, but kept architectural responsibility on the human side: the tool proposed options, then I evaluated trade-offs and chose the final direction before changes were kept.
 
 ## Run And Build
 
@@ -59,6 +65,13 @@ npm run build
 The development approach was to make queued work central to the product. Fraud review was a good fit because it naturally separates immediate order intake from asynchronous scoring, investigation support, and operational monitoring.
 
 The implementation was iterated in a tight loop: define the user-facing workflow, wire the queue boundaries, add visibility into job activity, then refine the UI and tests until the system was easy to explain and defend.
+
+## Key Discoveries
+
+- A queue-first product works better for this assignment when job activity is visible, not just technically present.
+- Background processing became much easier to explain once the app had an explicit monitoring surface instead of relying on hidden worker behavior.
+- AI accelerated implementation and debugging, but runtime and networking assumptions still needed human intervention and verification.
+- The strongest architectural decisions came from using AI as a collaborator, then overriding weaker suggestions in favor of simpler and more defensible behavior.
 
 ## Design
 
