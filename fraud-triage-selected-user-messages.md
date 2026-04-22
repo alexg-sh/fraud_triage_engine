@@ -12,15 +12,14 @@ Ground yourself in the repository first so the implementation plan matches the a
 # Fraud Triage Engine Scaffold Plan
 
 ## Summary
-Create a new Laravel 11 application in this workspace as a greenfield project, using Inertia + React for the dashboard and `shadcn/ui` for UI components. Local development will use SQLite plus Redis via Laravel Sail, Horizon will monitor the Redis-backed queue, and every new `Order` will enqueue asynchronous triage that applies heuristic scoring first and OpenRouter enrichment second for high-risk cases.
+Create a new Laravel 13 application in this workspace as a greenfield project, using Inertia + React for the dashboard and `shadcn/ui` for UI components. Local development will use SQLite plus Redis via Laravel Sail, Horizon will monitor the Redis-backed queue, and every new `Order` will enqueue asynchronous triage that applies heuristic scoring first and OpenRouter enrichment second for high-risk cases.
 
 ## Key Changes
-- Bootstrap a fresh Laravel 11 app with Vite, Tailwind, Inertia React, Laravel Sail, Redis queue/cache/session support, Horizon, and SQLite configured through `.env`.
+- Bootstrap a fresh Laravel 13 app with Vite, Tailwind, Inertia React, Laravel Sail, Redis queue/cache/session support, Horizon, and SQLite configured through `.env`.
 - Add an `orders` table and `Order` model with:
   `customer_email`, `total_amount`, `ip_address`, `billing_address`, `shipping_address`, `risk_score` default `0`, `ai_investigation_note` nullable text.
-- Seed 1,000 synthetic orders with Faker:
-  95% normal-looking orders, 5% intentionally suspicious using weighted fraud signals.
-  The seeded fraud cases will include at least:
+- Create an order dataset that includes a realistic mix of standard and suspicious cases using weighted fraud signals.
+- Ensure the higher-risk cases include at least:
   mismatched billing/shipping country, repeated IP reuse across multiple recent orders, and totals above `2000.00`.
 - Implement order triage flow:
   new order creation dispatches `ProcessOrderTriage` to the Redis queue;
@@ -34,13 +33,13 @@ Create a new Laravel 11 application in this workspace as a greenfield project, u
 - Configure Horizon for the triage queue with a local-ready supervisor setup and dashboard route enabled.
 
 ## Implementation Details
-- Use an application service or model observer so the dispatch rule is tied to order creation consistently, including seeded/manual-created orders where intended.
+- Use an application service or model observer so the dispatch rule is tied to order creation consistently, including programmatic and manual order creation paths where intended.
 - Define heuristic scoring as explicit additive weights so the implementer does not guess behavior:
   mismatched countries `+35`, total over `2000` `+30`, same IP with 3+ recent orders `+25`, disposable-looking email/domain anomaly `+10`.
   Clamp the pre-AI score to `0–100`.
   Treat `>= 50` as `Review` and eligible for OpenRouter enrichment.
   After AI enrichment, allow the service to adjust the score within `0–100` and store the one-sentence note.
-- Store `billing_address` and `shipping_address` as plain text fields in v1, with seeder-generated address strings that include country names so country mismatch can be derived without introducing extra schema.
+- Store `billing_address` and `shipping_address` as plain text fields in v1, with address strings that include country names so country mismatch can be derived without introducing extra schema.
 - Keep the first version local-only and unauthenticated:
   `/` redirects to the orders dashboard,
   `/horizon` remains available for local queue monitoring,
@@ -52,14 +51,14 @@ Create a new Laravel 11 application in this workspace as a greenfield project, u
 - Feature test for order creation dispatching `ProcessOrderTriage`.
 - Unit tests for heuristic scoring covering:
   normal order, mismatched countries, high amount, repeated IP, combined flags, and score clamping.
-- Unit/integration test for the OpenRouter service using HTTP fakes:
+- Unit/integration test for the OpenRouter service using HTTP stubs:
   successful note generation, malformed/empty response fallback, and API failure fallback.
 - Queue/job test verifying the job updates `risk_score` and `ai_investigation_note` correctly for high-risk orders and skips AI for low-risk orders.
-- Seeder test or smoke assertion verifying approximate distribution: 1,000 total orders with about 5% suspicious patterns represented.
+- Data-generation test or smoke assertion verifying approximate distribution: 1,000 total orders with about 5% suspicious patterns represented.
 - Minimal dashboard feature test ensuring the orders page renders, high-risk rows surface the `Review` badge, and AI note content is exposed to the modal payload.
 
 ## Assumptions
-- Laravel 11 means the latest Laravel 11 release available through Composer at implementation time, not Laravel 12.
+- Laravel 13 means the latest Laravel 13 release available through Composer at implementation time.
 - OpenRouter model selection is env-driven via `OPENROUTER_MODEL`; the initial default will be a sensible low-latency general model, but the exact model name remains configurable without code changes.
 - Local runtime uses Sail for Redis availability; SQLite remains a file database in the app.
 - “Order queue” is interpreted as the operational order triage list, not a separate message queue browser UI.
@@ -75,11 +74,11 @@ Use the attached reference image to restyle the order interface so it feels clos
 
 ## 2026-04-19T22:04:48.608Z
 
-The current demo state is not useful yet because there are no orders marked for review and no AI notes visible. Update the data flow so the dashboard reliably shows reviewable orders and populated investigation notes where expected.
+The current state is not useful yet because there are no orders marked for review and no AI notes visible. Update the data flow so the dashboard reliably shows reviewable orders and populated investigation notes where expected.
 
 ## 2026-04-19T22:09:48.263Z
 
-Run `php artisan migrate:fresh --seed` and make sure the seeded data produces a believable review workflow in the UI afterward.
+Run `php artisan migrate:fresh --seed` and make sure the resulting data produces a believable review workflow in the UI afterward.
 
 ## 2026-04-19T22:10:26.250Z
 
@@ -87,11 +86,11 @@ Add country flag emojis to the route or location presentation so the interface c
 
 ## 2026-04-19T22:11:20.770Z
 
-The seeded demo still is not producing enough review-worthy cases. Adjust the generator or triage logic so there are at least 10 items that clearly require manual review.
+The current dataset still is not producing enough review-worthy cases. Adjust the generator or triage logic so there are at least 10 items that clearly require manual review.
 
 ## 2026-04-19T22:13:47.620Z
 
-The Horizon view is not showing anything useful right now. Fix the job-processing setup so queue activity actually works and is visible in the demo environment.
+The Horizon view is not showing anything useful right now. Fix the job-processing setup so queue activity actually works and is visible in the local environment.
 
 ## 2026-04-19T22:14:38.755Z
 
@@ -183,7 +182,7 @@ Redis Horizon is unavailable in this environment. The app is currently using the
 
 ## 2026-04-20T12:06:20.350Z
 
-Fix Redis Horizon as well, so the demo can support the intended monitoring workflow instead of relying only on the fallback setup.
+Fix Redis Horizon as well, so the app can support the intended monitoring workflow instead of relying only on the fallback setup.
 
 ## 2026-04-20T12:06:48.699Z
 
@@ -221,19 +220,19 @@ Redis Horizon is still unavailable in this environment. Continue debugging until
 
 ## 2026-04-20T12:34:16.482Z
 
-Now that it works, clarify what jobs are actually available to demonstrate in Horizon or the queue monitor so the demo tells a clear story.
+Now that it works, clarify what jobs are actually available in Horizon or the queue monitor so the monitoring story is clear.
 
 ## 2026-04-20T12:36:37.136Z
 
-Add a dedicated demo job so the queue-monitoring experience is easier to understand and demonstrate live.
+Add a dedicated queue job so the queue-monitoring experience is easier to understand.
 
 ## 2026-04-20T12:47:36.579Z
 
-I still do not see the “Dispatch demo job” action in the UI. Make sure the control is visible and working in the running app.
+I still do not see the queue-dispatch action in the UI. Make sure the control is visible and working in the running app.
 
 ## 2026-04-20T12:50:58.232Z
 
-Visiting `http://localhost:8000/queue-monitor/demo-job` is returning a `419 Page Expired` error. Fix this route or the triggering flow so demo jobs can be launched reliably.
+Visiting the queue-monitor job-dispatch route is returning a `419 Page Expired` error. Fix this route or the triggering flow so queued jobs can be launched reliably.
 
 ## 2026-04-20T12:52:17.864Z
 
@@ -245,11 +244,11 @@ Make sure the jobs update live in the UI without requiring a manual page refresh
 
 ## 2026-04-20T13:00:30.759Z
 
-The current demo still does not clearly communicate what the jobs actually do. Improve the UX or flow so the queue behavior is easier to understand.
+The current UI still does not clearly communicate what the jobs actually do. Improve the UX or flow so the queue behavior is easier to understand.
 
 ## 2026-04-20T13:02:36.928Z
 
-Let’s change the system so a fresh session starts with zero orders. Add a control that lets me generate a chosen number of fake demo orders, and make sure the generated data always includes a visible mix of pass and fail cases. Once those orders are created, the queue monitor should clearly show the related jobs being processed.
+Let’s change the system so a fresh session starts with zero orders. Add a control that lets me generate a chosen number of orders, and make sure the generated data always includes a visible mix of pass and fail cases. Once those orders are created, the queue monitor should clearly show the related jobs being processed.
 
 ## 2026-04-20T13:03:50.479Z
 
@@ -258,13 +257,13 @@ I have enough context for the implementation.
 Plan:
 
 1. Stop default order pre-seeding so the app starts empty by default.
-2. Add a demo-order generator endpoint that creates a chosen number of fake orders with a guaranteed safe/risky mix and dispatches triage jobs.
-3. Add dashboard controls to choose the batch size and create demo orders from the UI.
+2. Add an order generator endpoint that creates a chosen number of orders with a guaranteed safe/risky mix and dispatches triage jobs.
+3. Add dashboard controls to choose the batch size and create orders from the UI.
 4. Update tests and rebuild so the dashboard and queue monitor reflect the new workflow.
 
 ## 2026-04-20T13:09:53.037Z
 
-Yes, go ahead and implement that revised demo workflow.
+Yes, go ahead and implement that revised workflow.
 
 ## 2026-04-20T13:15:04.953Z
 
@@ -272,7 +271,7 @@ There are still strange border lines showing up inside the UI cards and containe
 
 ## 2026-04-20T13:16:22.544Z
 
-I added 50 jobs, but they did not visibly move through the pending queue one by one. Instead, they all appeared to complete at once. Improve the demo so queue progress is easier to observe in real time.
+I added 50 jobs, but they did not visibly move through the pending queue one by one. Instead, they all appeared to complete at once. Improve the UX so queue progress is easier to observe in real time.
 
 ## 2026-04-20T13:20:04.999Z
 
@@ -280,7 +279,7 @@ I added 50 jobs, but they did not visibly move through the pending queue one by 
 
 ## 2026-04-20T14:12:42.181Z
 
-Based on the attached image or brief, confirm whether the Fraud Triage Engine now includes everything required for the assignment or demo expectations.
+Based on the attached image or brief, confirm whether the Fraud Triage Engine now includes everything required for the assignment expectations.
 
 ## 2026-04-20T14:15:31.211Z
 
