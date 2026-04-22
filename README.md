@@ -1,8 +1,8 @@
 # Fraud Triage Engine
 
-Fraud Triage Engine is a Laravel 11 demo app for asynchronous fraud review. Orders are ingested, pushed through a queue-backed triage flow, surfaced in an operations dashboard, and reviewed in an Inertia React interface.
+Fraud Triage Engine is a Laravel 13 app for asynchronous fraud review. Orders are ingested, pushed through a queue-backed triage flow, surfaced in an operations dashboard, and reviewed in an Inertia React interface.
 
-It exists to demonstrate a practical queued-job workflow in a small but explainable product. The project focuses on showing how background processing, operational visibility, and analyst review can fit together in one application instead of treating queues as hidden infrastructure.
+It exists to show a practical queued-job workflow in a small but explainable product. The project focuses on showing how background processing, operational visibility, and analyst review can fit together in one application instead of treating queues as hidden infrastructure.
 
 Selected user messages that shaped the build are collected in [fraud-triage-selected-user-messages.md](./fraud-triage-selected-user-messages.md).
 
@@ -25,6 +25,8 @@ php artisan key:generate
 touch database/database.sqlite
 php artisan migrate
 ```
+
+Set `OPENROUTER_API_KEY` in `.env` before running the app if you want AI investigation notes to work. The app expects a valid OpenRouter API key for that part of the workflow.
 
 3. Start the app:
 
@@ -56,7 +58,7 @@ npm run build
 
 The development approach was to make queued work central to the product. Fraud review was a good fit because it naturally separates immediate order intake from asynchronous scoring, investigation support, and operational monitoring.
 
-The implementation was iterated in a tight loop: define the user-facing workflow, wire the queue boundaries, add visibility into job activity, then refine the UI and tests until the demo was easy to explain and defend.
+The implementation was iterated in a tight loop: define the user-facing workflow, wire the queue boundaries, add visibility into job activity, then refine the UI and tests until the system was easy to explain and defend.
 
 ## Design
 
@@ -69,7 +71,7 @@ The design centers on an operations-first workflow:
 
 ## Stack
 
-- Backend: Laravel 11, PHP, Horizon
+- Backend: Laravel 13, PHP, Horizon
 - Frontend: Inertia React, TypeScript, Vite
 - UI: Tailwind CSS, `shadcn/ui`
 - Data store: SQLite
