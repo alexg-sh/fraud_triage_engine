@@ -1,6 +1,6 @@
-# Fraud Triage Engine Chats: Refined Conversation Transcript
+# Fraud Triage Engine Chats: Conversation Transcript
 
-Ordered by timestamp across the selected sessions. Existing refined user prompts were preserved, and Codex replies were interleaved from the original backup transcripts.
+Ordered by timestamp across the selected sessions. Existing user prompts were preserved, and Codex replies were interleaved from the original backup transcripts.
 
 ## 2026-04-19T20:27:31.378Z
 
