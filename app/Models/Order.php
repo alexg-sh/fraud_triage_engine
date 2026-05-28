@@ -18,6 +18,7 @@ class Order extends Model
      * @var list<string>
      */
     protected $fillable = [
+        
         'customer_email',
         'total_amount',
         'ip_address',
